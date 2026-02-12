@@ -140,7 +140,7 @@ a {
 
 .browser-layout {
   display: grid;
-  grid-template-columns: 260px minmax(300px, 1fr) minmax(360px, 1.2fr);
+  grid-template-columns: 220px minmax(250px, 0.85fr) minmax(420px, 1.65fr);
   gap: 1rem;
   min-height: calc(100vh - 220px);
 }
@@ -325,6 +325,61 @@ a {
   overflow: auto;
 }
 
+.pane-preview .pane-header {
+  padding: 0.6rem 0.75rem;
+}
+
+.pane-preview .doc-preview {
+  padding: 0.7rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.pane-preview .doc-preview h3 {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.25;
+}
+
+.pane-preview .doc-preview dl {
+  grid-template-columns: 72px 1fr;
+  gap: 0.2rem 0.45rem;
+  margin: 0.15rem 0 0.45rem;
+}
+
+.pane-preview .doc-preview .actions {
+  margin: 0;
+  gap: 0.4rem;
+}
+
+.pane-preview .doc-preview .button-link {
+  padding: 0.3rem 0.55rem;
+  font-size: 0.8rem;
+}
+
+.pane-preview .doc-preview section {
+  margin: 0;
+}
+
+.pane-preview .doc-preview h4 {
+  margin: 0 0 0.3rem;
+  font-size: 0.86rem;
+}
+
+.pane-preview .doc-preview section:last-of-type {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pane-preview .doc-preview section:last-of-type pre {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
 .doc-preview h3 {
   margin-top: 0;
 }
@@ -411,7 +466,7 @@ strong.message-structure {
 
 @media (max-width: 1200px) {
   .browser-layout {
-    grid-template-columns: 240px 1fr;
+    grid-template-columns: 220px 1fr;
   }
 
   .pane-preview {
