@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ doc["filename"] }}{% endblock %}
+{% block content %}
+<section class="doc-page">
+  <p><a href="{{ back }}">Back to Browser</a></p>
+  <h2>{{ doc["filename"] }}</h2>
+  <dl class="doc-details">
+    <dt>ID</dt>
+    <dd>{{ doc["id"] }}</dd>
+    <dt>Date</dt>
+    <dd>{{ doc["date"] or "Undated" }}</dd>
+    <dt>Dataset</dt>
+    <dd>{{ doc["dataset"] }}</dd>
+    <dt>From</dt>
+    <dd>{{ doc["from"] or "Not available" }}</dd>
+    <dt>To</dt>
+    <dd>{{ doc["to"] or "Not available" }}</dd>
+    <dt>Type</dt>
+    <dd>{{ doc["type"] or "Not available" }}</dd>
+  </dl>
+  <p>
+    <a class="button-link" href="{{ doc['url'] }}" target="_blank" rel="noopener noreferrer">Open Original Source</a>
+  </p>
+  {% if doc["content"] %}
+  <section>
+    <h3>Summary</h3>
+    <p>{{ doc["content"] }}</p>
+  </section>
+  {% endif %}
+  <section>
+    <h3>Message</h3>
+    <pre class="full-message">{{ doc["message"] }}</pre>
+  </section>
+</section>
+{% endblock %}

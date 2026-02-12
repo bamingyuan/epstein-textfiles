@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Document Browser{% endblock %}
+{% block content %}
+<section class="control-panel">
+  <form method="get" action="{{ url_for('browse') }}" class="search-form">
+    <label for="q">Search</label>
+    <input id="q" type="text" name="q" value="{{ q }}" placeholder="Try: meeting minutes OR exact phrase in quotes">
+
+    <label for="dataset">Dataset</label>
+    <select id="dataset" name="dataset">
+      <option value="">All datasets</option>
+      {% for ds in datasets %}
+      <option value="{{ ds['dataset'] }}" {% if dataset == ds['dataset'] %}selected{% endif %}>
+        {{ ds["dataset"] }} ({{ ds["count"] }})
+      </option>
+      {% endfor %}
+    </select>
+
+    <label for="scope">Search Scope</label>
+    <select id="scope" name="scope">
+      <option value="current" {% if scope == "current" %}selected{% endif %}>Within current browse period</option>
+      <option value="all" {% if scope == "all" %}selected{% endif %}>All documents</option>
+    </select>
+
+    <label for="sort">Sort</label>
+    <select id="sort" name="sort">
+      <option value="relevance" {% if sort == "relevance" %}selected{% endif %}>Relevance</option>
+      <option value="date_desc" {% if sort == "date_desc" %}selected{% endif %}>Date newest first</option>
+      <option value="date_asc" {% if sort == "date_asc" %}selected{% endif %}>Date oldest first</option>
+    </select>
+
+    <input type="hidden" name="year" value="{{ year or '' }}">
+    <input type="hidden" name="month" value="{{ month or '' }}">
+    <input type="hidden" name="day" value="{{ day or '' }}">
+    <input type="hidden" name="undated" value="{{ 1 if undated else '' }}">
+    <input type="hidden" name="per_page" value="{{ per_page }}">
+
+    <button type="submit">Apply</button>
+  </form>
+
+  <div class="control-notes">
+    <p><strong>{{ total }}</strong> documents in current result set.</p>
+    <p>
+      {% if fts_enabled %}
+      Full-text index is available.
+      {% else %}
+      Full-text index is not initialized yet. Search works, but can be slower.
+      {% endif %}
+    </p>
+  </div>
+</section>
+
+<section class="browser-layout">
+  <aside class="pane pane-nav">
+    <div class="pane-header">
+      <h2>Browse By Date</h2>
+      <div class="browse-tabs">
+        <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=year, month=month, day=day, per_page=per_page) }}" class="{% if not undated %}active{% endif %}">Dated</a>
+        <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, undated=1, per_page=per_page) }}" class="{% if undated %}active{% endif %}">Undated</a>
+      </div>
+    </div>
+
+    {% if not undated %}
+    <div class="date-section">
+      <h3>Years</h3>
+      <ul>
+        {% for y in years %}
+        <li>
+          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=y['year'], per_page=per_page) }}" class="{% if y['year'] == year %}active{% endif %}">
+            {{ y["year"] }}
+          </a>
+          <span>{{ y["count"] }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    {% if year %}
+    <div class="date-section">
+      <h3>Months</h3>
+      <ul>
+        {% for m in months %}
+        <li>
+          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=year, month=m['month'], per_page=per_page) }}" class="{% if m['month'] == month %}active{% endif %}">
+            {{ "%02d"|format(m["month"]) }}
+          </a>
+          <span>{{ m["count"] }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if year and month %}
+    <div class="date-section">
+      <h3>Days</h3>
+      <ul>
+        {% for d in days %}
+        <li>
+          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=year, month=month, day=d['day'], per_page=per_page) }}" class="{% if d['day'] == day %}active{% endif %}">
+            {{ "%02d"|format(d["day"]) }}
+          </a>
+          <span>{{ d["count"] }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="date-section">
+      <h3>Undated archive</h3>
+      <p class="muted">Browsing documents without a valid date.</p>
+    </div>
+    {% endif %}
+  </aside>
+
+  <section class="pane pane-list">
+    <div class="pane-header">
+      <h2>Document List</h2>
+      <p>Page {{ page }} of {{ total_pages }}</p>
+    </div>
+    <div class="list-scroll">
+      {% for row in rows %}
+      <article class="doc-row {% if selected_doc_id == row['id'] %}active{% endif %}">
+        <a class="doc-row-link" href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=year, month=month, day=day, undated=1 if undated else None, per_page=per_page, page=page, doc=row['id']) }}">
+          <div class="doc-meta">
+            <span class="doc-date">{{ row["date"] or "Undated" }}</span>
+            <span class="doc-dataset">{{ row["dataset"] }}</span>
+          </div>
+          <h3>{{ row["filename"] }}</h3>
+          <p>{{ row["content"] or row["preview"] }}</p>
+        </a>
+      </article>
+      {% else %}
+      <p class="muted">No documents matched the current filters.</p>
+      {% endfor %}
+    </div>
+
+    <nav class="pager">
+      {% if page > 1 %}
+      <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=year, month=month, day=day, undated=1 if undated else None, per_page=per_page, page=page-1, doc=selected_doc_id) }}">Previous</a>
+      {% else %}
+      <span class="disabled">Previous</span>
+      {% endif %}
+
+      {% if page < total_pages %}
+      <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=year, month=month, day=day, undated=1 if undated else None, per_page=per_page, page=page+1, doc=selected_doc_id) }}">Next</a>
+      {% else %}
+      <span class="disabled">Next</span>
+      {% endif %}
+    </nav>
+  </section>
+
+  <aside class="pane pane-preview">
+    <div class="pane-header">
+      <h2>Preview</h2>
+    </div>
+    {% if selected_doc %}
+    <div class="doc-preview">
+      <h3>{{ selected_doc["filename"] }}</h3>
+      <dl>
+        <dt>ID</dt>
+        <dd>{{ selected_doc["id"] }}</dd>
+        <dt>Date</dt>
+        <dd>{{ selected_doc["date"] or "Undated" }}</dd>
+        <dt>Dataset</dt>
+        <dd>{{ selected_doc["dataset"] }}</dd>
+        <dt>Type</dt>
+        <dd>{{ selected_doc["type"] or "Not available" }}</dd>
+      </dl>
+      <p class="actions">
+        <a class="button-link" href="{{ selected_doc['url'] }}" target="_blank" rel="noopener noreferrer">Open Original Source</a>
+        <a class="button-link secondary" href="{{ url_for('doc_detail', doc_id=selected_doc['id'], back=request.full_path) }}">Open Full View</a>
+      </p>
+      {% if selected_doc["content"] %}
+      <section>
+        <h4>Summary</h4>
+        <p>{{ selected_doc["content"] }}</p>
+      </section>
+      {% endif %}
+      <section>
+        <h4>Message</h4>
+        <pre>{{ selected_doc["message"] }}</pre>
+      </section>
+    </div>
+    {% else %}
+    <p class="muted">Select a document in the list to preview it.</p>
+    {% endif %}
+  </aside>
+</section>
+{% endblock %}
