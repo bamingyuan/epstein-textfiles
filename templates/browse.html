@@ -198,4 +198,36 @@
     {% endif %}
   </aside>
 </section>
+<script>
+  (function () {
+    const list = document.querySelector(".list-scroll");
+    if (!list) {
+      return;
+    }
+
+    const keyUrl = new URL(window.location.href);
+    keyUrl.searchParams.delete("doc");
+    const storageKey = "browse:list-scroll:" + keyUrl.pathname + "?" + keyUrl.searchParams.toString();
+
+    const savedScrollTop = sessionStorage.getItem(storageKey);
+    if (savedScrollTop !== null) {
+      const parsed = Number(savedScrollTop);
+      if (Number.isFinite(parsed)) {
+        requestAnimationFrame(function () {
+          list.scrollTop = parsed;
+        });
+      }
+    }
+
+    const saveScroll = function () {
+      sessionStorage.setItem(storageKey, String(list.scrollTop));
+    };
+
+    list.addEventListener("scroll", saveScroll, { passive: true });
+    window.addEventListener("beforeunload", saveScroll);
+    document.querySelectorAll(".doc-row-link").forEach(function (link) {
+      link.addEventListener("click", saveScroll);
+    });
+  })();
+</script>
 {% endblock %}
