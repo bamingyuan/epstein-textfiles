@@ -63,7 +63,7 @@
     </div>
 
     {% if not undated %}
-    <div class="date-section">
+    <div class="date-section date-section-years">
       <h3>Years</h3>
       <ul>
         <li>
@@ -84,7 +84,7 @@
     </div>
 
     {% if year %}
-    <div class="date-section">
+    <div class="date-section date-section-months">
       <h3>Months</h3>
       <ul>
         {% for m in months %}
@@ -101,7 +101,7 @@
     {% endif %}
 
     {% if year and month %}
-    <div class="date-section">
+    <div class="date-section date-section-days">
       <h3>Days</h3>
       <ul>
         {% for d in days %}

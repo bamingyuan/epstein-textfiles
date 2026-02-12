@@ -226,6 +226,15 @@ a {
   overflow: auto;
 }
 
+.date-section-years ul,
+.date-section-months ul {
+  max-height: 120px;
+}
+
+.date-section-days ul {
+  max-height: min(56vh, 430px);
+}
+
 .date-section li {
   display: flex;
   justify-content: space-between;
@@ -241,6 +250,12 @@ a {
   border-radius: 4px;
 }
 
+.date-section-years li a,
+.date-section-months li a {
+  font-size: 0.82rem;
+  padding: 0.05rem 0.22rem;
+}
+
 .date-section li a.active {
   color: #fff;
   background: var(--accent);
@@ -249,6 +264,11 @@ a {
 .date-section li span {
   font-size: 0.78rem;
   color: var(--ink-soft);
+}
+
+.date-section-years li span,
+.date-section-months li span {
+  font-size: 0.72rem;
 }
 
 .list-scroll {
@@ -508,6 +528,15 @@ strong.message-structure {
 
   .pane {
     min-height: 250px;
+  }
+
+  .date-section-years ul,
+  .date-section-months ul {
+    max-height: 100px;
+  }
+
+  .date-section-days ul {
+    max-height: min(46vh, 320px);
   }
 
   pre {
