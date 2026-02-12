@@ -180,7 +180,7 @@
       {% endif %}
       <section>
         <h4>Message</h4>
-        <pre>{{ selected_doc["message"] }}</pre>
+        <pre>{{ selected_doc["message"]|highlight_search(q) }}</pre>
       </section>
     </div>
     {% else %}

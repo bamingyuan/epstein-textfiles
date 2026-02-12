@@ -347,6 +347,13 @@ pre {
   line-height: 1.35;
 }
 
+mark.search-highlight {
+  background: #fff176;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 0.08em;
+}
+
 .doc-page {
   max-width: 1100px;
   background: var(--paper);

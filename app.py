@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import sqlite3
 from datetime import date, datetime
 
 from flask import Flask, abort, g, render_template, request, url_for
+from markupsafe import Markup, escape
 
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -113,6 +115,56 @@ def parse_search_terms(raw: str) -> list[str]:
     except ValueError:
         terms = raw.split()
     return [term.strip() for term in terms if term.strip()]
+
+
+def extract_positive_search_terms(raw: str) -> list[str]:
+    terms = parse_search_terms(raw)
+    seen: set[str] = set()
+    positive: list[str] = []
+
+    for term in terms:
+        if term.startswith("-") and len(term) > 1:
+            continue
+        normalized = term.strip().strip('"').strip()
+        if not normalized:
+            continue
+        if normalized.upper() in {"AND", "OR", "NOT"}:
+            continue
+        key = normalized.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        positive.append(normalized)
+    return positive
+
+
+@app.template_filter("highlight_search")
+def highlight_search_filter(text: str | None, raw_query: str | None = None) -> Markup:
+    if text is None:
+        return Markup("")
+    if not raw_query:
+        return escape(text)
+
+    terms = extract_positive_search_terms(raw_query)
+    if not terms:
+        return escape(text)
+
+    pattern = re.compile("|".join(re.escape(term) for term in sorted(terms, key=len, reverse=True)), re.IGNORECASE)
+    parts: list[Markup] = []
+    cursor = 0
+
+    for match in pattern.finditer(text):
+        start, end = match.span()
+        if start < cursor:
+            continue
+        parts.append(escape(text[cursor:start]))
+        parts.append(Markup('<mark class="search-highlight">'))
+        parts.append(escape(text[start:end]))
+        parts.append(Markup("</mark>"))
+        cursor = end
+
+    parts.append(escape(text[cursor:]))
+    return Markup("").join(parts)
 
 
 def build_fts_query(raw: str) -> str:
