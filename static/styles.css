@@ -25,6 +25,13 @@ body {
     var(--bg);
 }
 
+body.browse-page {
+  height: 100dvh;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
 a {
   color: var(--accent-strong);
 }
@@ -60,6 +67,16 @@ a {
   max-width: 1400px;
   margin: 0 auto;
   padding: 1rem 1.2rem 1.5rem;
+  width: 100%;
+}
+
+.page-shell-browser {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 1rem;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .control-panel {
@@ -128,6 +145,15 @@ a {
   min-height: calc(100vh - 220px);
 }
 
+.page-shell-browser .control-panel {
+  margin-bottom: 0;
+}
+
+.page-shell-browser .browser-layout {
+  height: 100%;
+  min-height: 0;
+}
+
 .pane {
   background: var(--paper);
   border: 1px solid var(--line);
@@ -137,6 +163,10 @@ a {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.page-shell-browser .pane {
+  min-height: 0;
 }
 
 .pane-header {
@@ -222,6 +252,8 @@ a {
 }
 
 .list-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   padding: 0.6rem;
   display: grid;
@@ -287,6 +319,8 @@ a {
 }
 
 .doc-preview {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 0.8rem 0.9rem;
   overflow: auto;
 }
@@ -386,6 +420,20 @@ strong.message-structure {
 }
 
 @media (max-width: 900px) {
+  body.browse-page {
+    height: auto;
+    min-height: 100dvh;
+    overflow: auto;
+    display: block;
+  }
+
+  .page-shell-browser {
+    height: auto;
+    display: block;
+    gap: 0;
+    overflow: visible;
+  }
+
   .control-panel {
     grid-template-columns: 1fr;
   }

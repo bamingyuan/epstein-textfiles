@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Document Browser{% endblock %}
+{% block body_class %}browse-page{% endblock %}
+{% block page_shell_class %}page-shell-browser{% endblock %}
 {% block content %}
 <section class="control-panel">
   <form method="get" action="{{ url_for('browse') }}" class="search-form">
