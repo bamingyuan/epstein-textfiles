@@ -5,6 +5,7 @@ import re
 import shlex
 import sqlite3
 from datetime import date, datetime
+from functools import lru_cache
 
 from flask import Flask, abort, g, render_template, request, url_for
 from markupsafe import Markup, escape
@@ -92,6 +93,20 @@ def close_db(_error: BaseException | None) -> None:
     conn = g.pop("db", None)
     if conn is not None:
         conn.close()
+
+
+def db_cache_token(db_path: str = DB_PATH) -> tuple[int, int]:
+    try:
+        stat = os.stat(db_path)
+    except OSError:
+        return (0, 0)
+    return (stat.st_mtime_ns, stat.st_size)
+
+
+def open_db_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 def to_int(value: str | None, fallback: int | None = None) -> int | None:
@@ -242,6 +257,15 @@ def has_fts(conn: sqlite3.Connection) -> bool:
     return "content='messages'" not in sql and "content = 'messages'" not in sql
 
 
+@lru_cache(maxsize=16)
+def cached_has_fts(db_path: str, cache_token: tuple[int, int]) -> bool:
+    conn = open_db_connection(db_path)
+    try:
+        return has_fts(conn)
+    finally:
+        conn.close()
+
+
 def date_exists_clause(alias: str = "m") -> str:
     return f'({alias}."date" IS NOT NULL AND TRIM({alias}."date") <> "")'
 
@@ -388,8 +412,8 @@ def sort_clause(sort: str, use_relevance: bool) -> str:
     if sort == "date_asc":
         return 'm."date" ASC, m."id" ASC'
     if sort == "relevance" and use_relevance:
-        return 'bm25(f), m."date" DESC, m."id" DESC'
-    return '(m."date" IS NULL OR TRIM(m."date") = "") ASC, m."date" DESC, m."id" DESC'
+        return 'bm25(messages_fts), m."date" DESC, m."id" DESC'
+    return 'm."date" DESC, m."id" DESC'
 
 
 def dataset_counts(conn: sqlite3.Connection) -> list[sqlite3.Row]:
@@ -458,6 +482,127 @@ def day_counts(
     return conn.execute(query, params).fetchall()
 
 
+def rows_to_dict_tuple(rows: list[sqlite3.Row]) -> tuple[dict[str, object], ...]:
+    return tuple(dict(row) for row in rows)
+
+
+@lru_cache(maxsize=64)
+def cached_dataset_counts(db_path: str, cache_token: tuple[int, int]) -> tuple[dict[str, object], ...]:
+    conn = open_db_connection(db_path)
+    try:
+        return rows_to_dict_tuple(dataset_counts(conn))
+    finally:
+        conn.close()
+
+
+@lru_cache(maxsize=256)
+def cached_year_counts(
+    db_path: str, cache_token: tuple[int, int], dataset: str | None
+) -> tuple[dict[str, object], ...]:
+    conn = open_db_connection(db_path)
+    try:
+        return rows_to_dict_tuple(year_counts(conn, dataset))
+    finally:
+        conn.close()
+
+
+@lru_cache(maxsize=512)
+def cached_month_counts(
+    db_path: str, cache_token: tuple[int, int], year: int | None, dataset: str | None
+) -> tuple[dict[str, object], ...]:
+    if year is None:
+        return ()
+    conn = open_db_connection(db_path)
+    try:
+        return rows_to_dict_tuple(month_counts(conn, year, dataset))
+    finally:
+        conn.close()
+
+
+@lru_cache(maxsize=1024)
+def cached_day_counts(
+    db_path: str,
+    cache_token: tuple[int, int],
+    year: int | None,
+    month: int | None,
+    dataset: str | None,
+) -> tuple[dict[str, object], ...]:
+    if year is None or month is None:
+        return ()
+    conn = open_db_connection(db_path)
+    try:
+        return rows_to_dict_tuple(day_counts(conn, year, month, dataset))
+    finally:
+        conn.close()
+
+
+@lru_cache(maxsize=512)
+def cached_browse_page(
+    db_path: str,
+    cache_token: tuple[int, int],
+    q: str,
+    dataset: str | None,
+    scope: str,
+    sort: str,
+    page: int,
+    per_page: int,
+    undated: bool,
+    year: int | None,
+    month: int | None,
+    day: int | None,
+) -> dict[str, object]:
+    conn = open_db_connection(db_path)
+    try:
+        where, params = build_browse_filters(dataset, scope, year, month, day, undated)
+        from_sql = "messages m"
+        use_fts = False
+        fts_enabled = cached_has_fts(db_path, cache_token)
+
+        if q:
+            fts_query = build_fts_query(q)
+            if fts_enabled and fts_query:
+                from_sql = "messages m JOIN messages_fts ON messages_fts.rowid = m.id"
+                where.append("messages_fts MATCH ?")
+                params.append(fts_query)
+                use_fts = True
+            else:
+                apply_like_search(where, params, q)
+
+        where_sql = " AND ".join(where)
+        count_sql = f"SELECT COUNT(*) AS count FROM {from_sql} WHERE {where_sql}"
+        total = conn.execute(count_sql, params).fetchone()["count"]
+        total_pages = max(1, (total + per_page - 1) // per_page)
+        current_page = min(page, total_pages)
+        offset = (current_page - 1) * per_page
+
+        order_sql = sort_clause(sort, use_fts and bool(q))
+        list_sql = f"""
+            SELECT
+                m."id",
+                m."filename",
+                m."dataset",
+                m."date",
+                m."url",
+                m."content",
+                SUBSTR(m."message", 1, 700) AS preview
+            FROM {from_sql}
+            WHERE {where_sql}
+            ORDER BY {order_sql}
+            LIMIT ? OFFSET ?
+        """
+        rows = conn.execute(list_sql, params + [per_page, offset]).fetchall()
+
+        return {
+            "total": total,
+            "total_pages": total_pages,
+            "page": current_page,
+            "rows": rows_to_dict_tuple(rows),
+            "fts_enabled": fts_enabled,
+        }
+    finally:
+        conn.close()
+
+
 @app.route("/")
 @app.route("/browse")
 def browse() -> str:
@@ -483,45 +628,25 @@ def browse() -> str:
     selected_doc_id = to_int(request.args.get("doc"))
 
     year, month, day = normalize_period(conn, year, month, day, undated, dataset, scope)
-
-    where, params = build_browse_filters(dataset, scope, year, month, day, undated)
-    from_sql = "messages m"
-    use_fts = False
-
-    if q:
-        fts_query = build_fts_query(q)
-        if has_fts(conn) and fts_query:
-            from_sql = "messages m JOIN messages_fts f ON f.rowid = m.id"
-            where.append("messages_fts MATCH ?")
-            params.append(fts_query)
-            use_fts = True
-        else:
-            apply_like_search(where, params, q)
-
-    where_sql = " AND ".join(where)
-    count_sql = f"SELECT COUNT(*) AS count FROM {from_sql} WHERE {where_sql}"
-    total = conn.execute(count_sql, params).fetchone()["count"]
-    total_pages = max(1, (total + per_page - 1) // per_page)
-    if page > total_pages:
-        page = total_pages
-    offset = (page - 1) * per_page
-
-    order_sql = sort_clause(sort, use_fts and bool(q))
-    list_sql = f"""
-        SELECT
-            m."id",
-            m."filename",
-            m."dataset",
-            m."date",
-            m."url",
-            m."content",
-            SUBSTR(m."message", 1, 700) AS preview
-        FROM {from_sql}
-        WHERE {where_sql}
-        ORDER BY {order_sql}
-        LIMIT ? OFFSET ?
-    """
-    rows = conn.execute(list_sql, params + [per_page, offset]).fetchall()
+    cache_token = db_cache_token(DB_PATH)
+    page_data = cached_browse_page(
+        DB_PATH,
+        cache_token,
+        q,
+        dataset,
+        scope,
+        sort,
+        page,
+        per_page,
+        undated,
+        year,
+        month,
+        day,
+    )
+    total = page_data["total"]
+    total_pages = page_data["total_pages"]
+    page = page_data["page"]
+    rows = page_data["rows"]
 
     if selected_doc_id is None and rows:
         selected_doc_id = rows[0]["id"]
@@ -547,10 +672,10 @@ def browse() -> str:
             [selected_doc_id],
         ).fetchone()
 
-    years = year_counts(conn, dataset)
-    months = month_counts(conn, year, dataset)
-    days = day_counts(conn, year, month, dataset)
-    datasets = dataset_counts(conn)
+    years = cached_year_counts(DB_PATH, cache_token, dataset)
+    months = cached_month_counts(DB_PATH, cache_token, year, dataset)
+    days = cached_day_counts(DB_PATH, cache_token, year, month, dataset)
+    datasets = cached_dataset_counts(DB_PATH, cache_token)
 
     return render_template(
         "browse.html",
@@ -573,7 +698,7 @@ def browse() -> str:
         day=day,
         undated=undated,
         datasets=datasets,
-        fts_enabled=has_fts(conn),
+        fts_enabled=page_data["fts_enabled"],
     )
 
 
