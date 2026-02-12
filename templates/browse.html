@@ -190,7 +190,7 @@
       {% endif %}
       <section>
         <h4>Message</h4>
-        <pre>{{ selected_doc["message"]|highlight_search(q) }}</pre>
+        <pre class="preview-message">{{ selected_doc["message"]|highlight_search(q) }}</pre>
       </section>
     </div>
     {% else %}
@@ -246,6 +246,7 @@
     });
 
     const links = Array.from(document.querySelectorAll(".doc-row-link"));
+    const messagePane = document.querySelector(".preview-message");
     if (!links.length) {
       return;
     }
@@ -261,6 +262,24 @@
       return tagName === "input" || tagName === "textarea" || tagName === "select";
     };
 
+    const canPageMessage = function (direction) {
+      if (!messagePane) {
+        return false;
+      }
+      if (direction > 0) {
+        return messagePane.scrollTop + messagePane.clientHeight < messagePane.scrollHeight - 1;
+      }
+      return messagePane.scrollTop > 0;
+    };
+
+    const pageMessage = function (direction) {
+      if (!messagePane) {
+        return;
+      }
+      const amount = Math.max(messagePane.clientHeight - 24, 80);
+      messagePane.scrollBy({ top: amount * direction, behavior: "auto" });
+    };
+
     document.addEventListener("keydown", function (event) {
       if (event.defaultPrevented) {
         return;
@@ -268,10 +287,20 @@
       if (event.altKey || event.ctrlKey || event.metaKey) {
         return;
       }
-      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+      if (isTypingTarget(event.target)) {
         return;
       }
-      if (isTypingTarget(event.target)) {
+
+      const isSpace = event.code === "Space" || event.key === " " || event.key === "Spacebar";
+      if (isSpace) {
+        const direction = event.shiftKey ? -1 : 1;
+        if (canPageMessage(direction)) {
+          event.preventDefault();
+          pageMessage(direction);
+        }
+        return;
+      }
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
         return;
       }
 
