@@ -287,6 +287,7 @@ def normalize_period(
     day: int | None,
     undated: bool,
     dataset: str | None,
+    scope: str,
 ) -> tuple[int | None, int | None, int | None]:
     if undated:
         return None, None, None
@@ -298,6 +299,8 @@ def normalize_period(
         day = None
 
     if year is None:
+        if scope != "current":
+            return None, None, None
         latest = get_latest_available_date(conn, dataset)
         if latest:
             latest_dt = datetime.strptime(latest, "%Y-%m-%d").date()
@@ -345,19 +348,22 @@ def build_browse_filters(
         where.append(undated_clause("m"))
         return where, params
 
-    if scope == "current":
+    if day is not None and year is not None and month is not None:
         where.append(date_exists_clause("m"))
-        if day is not None and year is not None and month is not None:
-            where.append('m."date" = ?')
-            params.append(f"{year:04d}-{month:02d}-{day:02d}")
-        elif month is not None and year is not None:
-            start, end = date_range(year, month)
-            where.append('m."date" >= ? AND m."date" < ?')
-            params.extend([start, end])
-        elif year is not None:
-            start, end = date_range(year)
-            where.append('m."date" >= ? AND m."date" < ?')
-            params.extend([start, end])
+        where.append('m."date" = ?')
+        params.append(f"{year:04d}-{month:02d}-{day:02d}")
+    elif month is not None and year is not None:
+        where.append(date_exists_clause("m"))
+        start, end = date_range(year, month)
+        where.append('m."date" >= ? AND m."date" < ?')
+        params.extend([start, end])
+    elif year is not None:
+        where.append(date_exists_clause("m"))
+        start, end = date_range(year)
+        where.append('m."date" >= ? AND m."date" < ?')
+        params.extend([start, end])
+    elif scope == "current":
+        where.append(date_exists_clause("m"))
     return where, params
 
 
@@ -476,7 +482,7 @@ def browse() -> str:
     day = to_int(request.args.get("day"))
     selected_doc_id = to_int(request.args.get("doc"))
 
-    year, month, day = normalize_period(conn, year, month, day, undated, dataset)
+    year, month, day = normalize_period(conn, year, month, day, undated, dataset, scope)
 
     where, params = build_browse_filters(dataset, scope, year, month, day, undated)
     from_sql = "messages m"

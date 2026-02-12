@@ -55,7 +55,7 @@
     <div class="pane-header">
       <h2>Browse By Date</h2>
       <div class="browse-tabs">
-        <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=year, month=month, day=day, per_page=per_page) }}" class="{% if not undated %}active{% endif %}">Dated</a>
+        <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='current', sort=sort, year=year, month=month, day=day, per_page=per_page) }}" class="{% if not undated %}active{% endif %}">Dated</a>
         <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, undated=1, per_page=per_page) }}" class="{% if undated %}active{% endif %}">Undated</a>
       </div>
     </div>
@@ -64,9 +64,15 @@
     <div class="date-section">
       <h3>Years</h3>
       <ul>
-        {% for y in years %}
         <li>
-          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=y['year'], per_page=per_page) }}" class="{% if y['year'] == year %}active{% endif %}">
+          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='all', sort=sort, per_page=per_page) }}" class="{% if not year and not month and not day %}active{% endif %}">
+            All dates
+          </a>
+        </li>
+        {% for y in years %}
+        {% set year_active = y['year'] == year %}
+        <li>
+          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='all' if year_active else 'current', sort=sort, year=None if year_active else y['year'], month=None, day=None, per_page=per_page) }}" class="{% if year_active %}active{% endif %}">
             {{ y["year"] }}
           </a>
           <span>{{ y["count"] }}</span>
@@ -80,8 +86,9 @@
       <h3>Months</h3>
       <ul>
         {% for m in months %}
+        {% set month_active = m['month'] == month %}
         <li>
-          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=year, month=m['month'], per_page=per_page) }}" class="{% if m['month'] == month %}active{% endif %}">
+          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='current', sort=sort, year=year, month=None if month_active else m['month'], day=None, per_page=per_page) }}" class="{% if month_active %}active{% endif %}">
             {{ "%02d"|format(m["month"]) }}
           </a>
           <span>{{ m["count"] }}</span>
@@ -96,8 +103,9 @@
       <h3>Days</h3>
       <ul>
         {% for d in days %}
+        {% set day_active = d['day'] == day %}
         <li>
-          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=year, month=month, day=d['day'], per_page=per_page) }}" class="{% if d['day'] == day %}active{% endif %}">
+          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='current', sort=sort, year=year, month=month, day=None if day_active else d['day'], per_page=per_page) }}" class="{% if day_active %}active{% endif %}">
             {{ "%02d"|format(d["day"]) }}
           </a>
           <span>{{ d["count"] }}</span>
