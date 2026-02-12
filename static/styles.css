@@ -235,6 +235,24 @@ a {
   max-height: min(56vh, 430px);
 }
 
+.pane-nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.pane-nav .date-section-days {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pane-nav .date-section-days ul {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
 .date-section li {
   display: flex;
   justify-content: space-between;
