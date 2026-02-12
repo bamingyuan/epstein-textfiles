@@ -138,18 +138,27 @@ def extract_positive_search_terms(raw: str) -> list[str]:
     return positive
 
 
-@app.template_filter("highlight_search")
-def highlight_search_filter(text: str | None, raw_query: str | None = None) -> Markup:
-    if text is None:
-        return Markup("")
-    if not raw_query:
-        return escape(text)
+STRUCTURE_LINE_RE = re.compile(
+    r'^\s*(?:/{3,}\s*PAGE\b.*|(?:From|Sent|To|Subject)\s*:.*)\s*$',
+    re.IGNORECASE,
+)
 
+
+def search_highlight_pattern(raw_query: str | None) -> re.Pattern[str] | None:
+    if not raw_query:
+        return None
     terms = extract_positive_search_terms(raw_query)
     if not terms:
-        return escape(text)
+        return None
+    return re.compile(
+        "|".join(re.escape(term) for term in sorted(terms, key=len, reverse=True)),
+        re.IGNORECASE,
+    )
 
-    pattern = re.compile("|".join(re.escape(term) for term in sorted(terms, key=len, reverse=True)), re.IGNORECASE)
+
+def render_highlighted_text(text: str, pattern: re.Pattern[str] | None) -> Markup:
+    if pattern is None:
+        return escape(text)
     parts: list[Markup] = []
     cursor = 0
 
@@ -165,6 +174,31 @@ def highlight_search_filter(text: str | None, raw_query: str | None = None) -> M
 
     parts.append(escape(text[cursor:]))
     return Markup("").join(parts)
+
+
+@app.template_filter("highlight_search")
+def highlight_search_filter(text: str | None, raw_query: str | None = None) -> Markup:
+    if text is None:
+        return Markup("")
+
+    pattern = search_highlight_pattern(raw_query)
+    rendered: list[Markup] = []
+
+    for line in text.splitlines(keepends=True):
+        line_text = line.rstrip("\r\n")
+        line_break = line[len(line_text) :]
+
+        line_markup = render_highlighted_text(line_text, pattern)
+        if STRUCTURE_LINE_RE.match(line_text):
+            line_markup = Markup('<strong class="message-structure">') + line_markup + Markup("</strong>")
+
+        rendered.append(line_markup)
+        if line_break:
+            rendered.append(Markup(line_break))
+
+    if not rendered:
+        return render_highlighted_text(text, pattern)
+    return Markup("").join(rendered)
 
 
 def build_fts_query(raw: str) -> str:
