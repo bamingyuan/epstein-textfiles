@@ -139,7 +139,11 @@ def extract_positive_search_terms(raw: str) -> list[str]:
 
 
 STRUCTURE_LINE_RE = re.compile(
-    r'^\s*(?:/{3,}\s*PAGE\b.*|(?:From|Sent|To|Subject)\s*:.*)\s*$',
+    r"^\s*(?:"
+    r"/{3,}\s*PAGE\b.*"
+    r"|(?:From|Sent|To|Subject|Cc|Date)\b\s*:?\s*.*"
+    r"|On\b.*\bwrote\b\s*:?"
+    r")\s*$",
     re.IGNORECASE,
 )
 
