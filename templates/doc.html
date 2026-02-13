@@ -8,7 +8,9 @@
     <dt>ID</dt>
     <dd>{{ doc["id"] }}</dd>
     <dt>Date</dt>
-    <dd>{{ doc["date"] or "Undated" }}</dd>
+    <dd>{{ doc["date"]|display_date or "Undated" }}</dd>
+    <dt>Time</dt>
+    <dd>{{ doc["time"]|display_time or "Not available" }}</dd>
     <dt>Dataset</dt>
     <dd>{{ doc["dataset"] }}</dd>
     <dt>From</dt>

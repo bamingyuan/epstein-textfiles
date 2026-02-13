@@ -4,7 +4,7 @@ import os
 import re
 import shlex
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import lru_cache
 
 from flask import Flask, abort, g, render_template, request, url_for
@@ -12,7 +12,40 @@ from markupsafe import Markup, escape
 
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DB_PATH = os.environ.get("PDF_MESSAGES_DB", os.path.join(BASE_DIR, "pdf_messages.db"))
+
+
+def db_has_messages_table(db_path: str) -> bool:
+    if not os.path.exists(db_path):
+        return False
+    try:
+        conn = sqlite3.connect(db_path)
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='messages' LIMIT 1"
+            ).fetchone()
+            return row is not None
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return False
+
+
+def resolve_default_db_path(base_dir: str = BASE_DIR) -> str:
+    env_path = os.environ.get("PDF_MESSAGES_DB")
+    if env_path:
+        return env_path
+
+    exported_path = os.path.join(base_dir, "exported_data.db")
+    legacy_path = os.path.join(base_dir, "pdf_messages.db")
+    for candidate in (exported_path, legacy_path):
+        if db_has_messages_table(candidate):
+            return candidate
+    if os.path.exists(exported_path):
+        return exported_path
+    return legacy_path
+
+
+DB_PATH = resolve_default_db_path()
 PER_PAGE_DEFAULT = 50
 PER_PAGE_MAX = 100
 
@@ -120,6 +153,36 @@ def to_int(value: str | None, fallback: int | None = None) -> int | None:
 
 def clean_string(value: str | None) -> str:
     return (value or "").strip()
+
+
+def extract_date_portion(value: str | None) -> str | None:
+    text = clean_string(value)
+    if not text:
+        return None
+    if len(text) >= 10 and re.match(r"^\d{4}-\d{2}-\d{2}$", text[:10]):
+        return text[:10]
+    return text
+
+
+def extract_time_portion(value: str | None) -> str | None:
+    text = clean_string(value)
+    if not text:
+        return None
+    if len(text) >= 19 and re.match(r"^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$", text[:19]):
+        return text[11:19]
+    if len(text) >= 8 and re.match(r"^\d{2}:\d{2}:\d{2}$", text[:8]):
+        return text[:8]
+    return text
+
+
+@app.template_filter("display_date")
+def display_date_filter(value: str | None) -> str:
+    return extract_date_portion(value) or ""
+
+
+@app.template_filter("display_time")
+def display_time_filter(value: str | None) -> str:
+    return extract_time_portion(value) or ""
 
 
 def parse_search_terms(raw: str) -> list[str]:
@@ -266,6 +329,20 @@ def cached_has_fts(db_path: str, cache_token: tuple[int, int]) -> bool:
         conn.close()
 
 
+@lru_cache(maxsize=32)
+def cached_messages_columns(db_path: str, cache_token: tuple[int, int]) -> tuple[str, ...]:
+    conn = open_db_connection(db_path)
+    try:
+        rows = conn.execute('PRAGMA table_info("messages")').fetchall()
+        return tuple(row["name"] for row in rows)
+    finally:
+        conn.close()
+
+
+def has_time_column(db_path: str, cache_token: tuple[int, int]) -> bool:
+    return "time" in cached_messages_columns(db_path, cache_token)
+
+
 def date_exists_clause(alias: str = "m") -> str:
     return f'({alias}."date" IS NOT NULL AND TRIM({alias}."date") <> "")'
 
@@ -274,18 +351,23 @@ def undated_clause(alias: str = "m") -> str:
     return f'({alias}."date" IS NULL OR TRIM({alias}."date") = "")'
 
 
+def date_value_clause(alias: str = "m") -> str:
+    return f'SUBSTR({alias}."date", 1, 10)'
+
+
 def get_latest_available_date(conn: sqlite3.Connection, dataset: str | None = None) -> str | None:
-    where = [date_exists_clause("messages"), '"messages"."date" <= date("now")']
+    message_date = date_value_clause("messages")
+    where = [date_exists_clause("messages"), f"{message_date} <= date('now')"]
     params: list[str] = []
     if dataset:
         where.append('"messages"."dataset" = ?')
         params.append(dataset)
 
     query = f"""
-        SELECT "date"
+        SELECT {message_date} AS "date"
         FROM messages
         WHERE {" AND ".join(where)}
-        ORDER BY "date" DESC
+        ORDER BY {message_date} DESC
         LIMIT 1
     """
     row = conn.execute(query, params).fetchone()
@@ -293,11 +375,11 @@ def get_latest_available_date(conn: sqlite3.Connection, dataset: str | None = No
         return row["date"]
 
     fallback = conn.execute(
-        """
-        SELECT "date"
+        f"""
+        SELECT {message_date} AS "date"
         FROM messages
-        WHERE "date" IS NOT NULL AND TRIM("date") <> ""
-        ORDER BY "date" DESC
+        WHERE {date_exists_clause("messages")}
+        ORDER BY {message_date} DESC
         LIMIT 1
         """
     ).fetchone()
@@ -327,8 +409,14 @@ def normalize_period(
             return None, None, None
         latest = get_latest_available_date(conn, dataset)
         if latest:
-            latest_dt = datetime.strptime(latest, "%Y-%m-%d").date()
-            return latest_dt.year, latest_dt.month, None
+            latest_date = extract_date_portion(latest)
+            if latest_date:
+                try:
+                    latest_dt = datetime.strptime(latest_date, "%Y-%m-%d").date()
+                except ValueError:
+                    latest_dt = None
+                if latest_dt is not None:
+                    return latest_dt.year, latest_dt.month, None
         return None, None, None
 
     if month is not None and not 1 <= month <= 12:
@@ -336,6 +424,11 @@ def normalize_period(
         day = None
     if day is not None and not 1 <= day <= 31:
         day = None
+    if year is not None and month is not None and day is not None:
+        try:
+            date(year, month, day)
+        except ValueError:
+            day = None
 
     return year, month, day
 
@@ -350,6 +443,12 @@ def date_range(year: int, month: int | None = None) -> tuple[str, str]:
         end = date(year + 1, 1, 1)
     else:
         end = date(year, month + 1, 1)
+    return start.isoformat(), end.isoformat()
+
+
+def day_range(year: int, month: int, day: int) -> tuple[str, str]:
+    start = date(year, month, day)
+    end = start + timedelta(days=1)
     return start.isoformat(), end.isoformat()
 
 
@@ -374,8 +473,9 @@ def build_browse_filters(
 
     if day is not None and year is not None and month is not None:
         where.append(date_exists_clause("m"))
-        where.append('m."date" = ?')
-        params.append(f"{year:04d}-{month:02d}-{day:02d}")
+        start, end = day_range(year, month, day)
+        where.append('m."date" >= ? AND m."date" < ?')
+        params.extend([start, end])
     elif month is not None and year is not None:
         where.append(date_exists_clause("m"))
         start, end = date_range(year, month)
@@ -408,12 +508,19 @@ def apply_like_search(where: list[str], params: list[str], query: str) -> None:
         params.extend([like, like, like, like])
 
 
-def sort_clause(sort: str, use_relevance: bool) -> str:
+def sort_clause(sort: str, use_relevance: bool, include_time: bool) -> str:
+    if include_time:
+        ascending = 'm."date" ASC, m."time" ASC, m."id" ASC'
+        descending = 'm."date" DESC, m."time" DESC, m."id" DESC'
+    else:
+        ascending = 'm."date" ASC, m."id" ASC'
+        descending = 'm."date" DESC, m."id" DESC'
+
     if sort == "date_asc":
-        return 'm."date" ASC, m."id" ASC'
+        return ascending
     if sort == "relevance" and use_relevance:
-        return 'bm25(messages_fts), m."date" DESC, m."id" DESC'
-    return 'm."date" DESC, m."id" DESC'
+        return f"bm25(messages_fts), {descending}"
+    return descending
 
 
 def dataset_counts(conn: sqlite3.Connection) -> list[sqlite3.Row]:
@@ -550,6 +657,7 @@ def cached_browse_page(
     year: int | None,
     month: int | None,
     day: int | None,
+    include_time: bool,
 ) -> dict[str, object]:
     conn = open_db_connection(db_path)
     try:
@@ -575,13 +683,15 @@ def cached_browse_page(
         current_page = min(page, total_pages)
         offset = (current_page - 1) * per_page
 
-        order_sql = sort_clause(sort, use_fts and bool(q))
+        order_sql = sort_clause(sort, use_fts and bool(q), include_time)
+        time_select_sql = 'm."time" AS "time"' if include_time else 'NULL AS "time"'
         list_sql = f"""
             SELECT
                 m."id",
                 m."filename",
                 m."dataset",
                 m."date",
+                {time_select_sql},
                 m."url",
                 m."content",
                 SUBSTR(m."message", 1, 700) AS preview
@@ -629,6 +739,7 @@ def browse() -> str:
 
     year, month, day = normalize_period(conn, year, month, day, undated, dataset, scope)
     cache_token = db_cache_token(DB_PATH)
+    include_time = has_time_column(DB_PATH, cache_token)
     page_data = cached_browse_page(
         DB_PATH,
         cache_token,
@@ -642,6 +753,7 @@ def browse() -> str:
         year,
         month,
         day,
+        include_time,
     )
     total = page_data["total"]
     total_pages = page_data["total_pages"]
@@ -653,13 +765,15 @@ def browse() -> str:
 
     selected_doc = None
     if selected_doc_id is not None:
+        time_select_sql = '"time" AS "time"' if include_time else 'NULL AS "time"'
         selected_doc = conn.execute(
-            """
+            f"""
             SELECT
                 "id",
                 "filename",
                 "dataset",
                 "date",
+                {time_select_sql},
                 "from",
                 "to",
                 "type",
@@ -705,13 +819,17 @@ def browse() -> str:
 @app.route("/doc/<int:doc_id>")
 def doc_detail(doc_id: int) -> str:
     conn = get_db()
+    cache_token = db_cache_token(DB_PATH)
+    include_time = has_time_column(DB_PATH, cache_token)
+    time_select_sql = '"time" AS "time"' if include_time else 'NULL AS "time"'
     doc = conn.execute(
-        """
+        f"""
         SELECT
             "id",
             "filename",
             "dataset",
             "date",
+            {time_select_sql},
             "from",
             "to",
             "type",

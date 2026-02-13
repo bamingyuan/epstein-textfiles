@@ -134,7 +134,11 @@
       <article class="doc-row {% if selected_doc_id == row['id'] %}active{% endif %}">
         <a class="doc-row-link" href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=year, month=month, day=day, undated=1 if undated else None, per_page=per_page, page=page, doc=row['id']) }}">
           <div class="doc-meta">
-            <span class="doc-date">{{ row["date"] or "Undated" }}</span>
+            {% set row_date = row["date"]|display_date %}
+            {% set row_time = row["time"]|display_time %}
+            <span class="doc-date">
+              {{ row_date or "Undated" }}{% if row_time %} {{ row_time }}{% endif %}
+            </span>
             <span class="doc-dataset">{{ row["dataset"] }}</span>
           </div>
           <h3>{{ row["filename"] }}</h3>
@@ -172,7 +176,9 @@
         <dt>ID</dt>
         <dd>{{ selected_doc["id"] }}</dd>
         <dt>Date</dt>
-        <dd>{{ selected_doc["date"] or "Undated" }}</dd>
+        <dd>{{ selected_doc["date"]|display_date or "Undated" }}</dd>
+        <dt>Time</dt>
+        <dd>{{ selected_doc["time"]|display_time or "Not available" }}</dd>
         <dt>Dataset</dt>
         <dd>{{ selected_doc["dataset"] }}</dd>
         <dt>Type</dt>
