@@ -26,9 +26,8 @@
 
     <label for="sort">Sort</label>
     <select id="sort" name="sort">
-      <option value="relevance" {% if sort == "relevance" %}selected{% endif %}>Relevance</option>
-      <option value="date_desc" {% if sort == "date_desc" %}selected{% endif %}>Date newest first</option>
-      <option value="date_asc" {% if sort == "date_asc" %}selected{% endif %}>Date oldest first</option>
+      <option value="date_asc" {% if sort == "date_asc" %}selected{% endif %}>Date/time oldest first</option>
+      <option value="date_desc" {% if sort == "date_desc" %}selected{% endif %}>Date/time newest first</option>
     </select>
 
     <input type="hidden" name="year" value="{{ year or '' }}">

@@ -50,7 +50,7 @@ PER_PAGE_DEFAULT = 50
 PER_PAGE_MAX = 100
 
 ALLOWED_SCOPE = {"current", "all"}
-ALLOWED_SORT = {"date_desc", "date_asc", "relevance"}
+ALLOWED_SORT = {"date_desc", "date_asc"}
 
 SEARCH_INDEX_SQL = [
     'CREATE INDEX IF NOT EXISTS idx_messages_date ON messages("date")',
@@ -508,19 +508,19 @@ def apply_like_search(where: list[str], params: list[str], query: str) -> None:
         params.extend([like, like, like, like])
 
 
-def sort_clause(sort: str, use_relevance: bool, include_time: bool) -> str:
+def sort_clause(sort: str, include_time: bool) -> str:
     if include_time:
-        ascending = 'm."date" ASC, m."time" ASC, m."id" ASC'
-        descending = 'm."date" DESC, m."time" DESC, m."id" DESC'
+        # Keep rows without a time value at the end in both sort directions.
+        time_missing_last = 'CASE WHEN m."time" IS NULL OR TRIM(m."time") = "" THEN 1 ELSE 0 END ASC'
+        ascending = f'm."date" ASC, {time_missing_last}, m."time" ASC, m."id" ASC'
+        descending = f'm."date" DESC, {time_missing_last}, m."time" DESC, m."id" DESC'
     else:
         ascending = 'm."date" ASC, m."id" ASC'
         descending = 'm."date" DESC, m."id" DESC'
 
-    if sort == "date_asc":
-        return ascending
-    if sort == "relevance" and use_relevance:
-        return f"bm25(messages_fts), {descending}"
-    return descending
+    if sort == "date_desc":
+        return descending
+    return ascending
 
 
 def dataset_counts(conn: sqlite3.Connection) -> list[sqlite3.Row]:
@@ -663,7 +663,6 @@ def cached_browse_page(
     try:
         where, params = build_browse_filters(dataset, scope, year, month, day, undated)
         from_sql = "messages m"
-        use_fts = False
         fts_enabled = cached_has_fts(db_path, cache_token)
 
         if q:
@@ -672,7 +671,6 @@ def cached_browse_page(
                 from_sql = "messages m JOIN messages_fts ON messages_fts.rowid = m.id"
                 where.append("messages_fts MATCH ?")
                 params.append(fts_query)
-                use_fts = True
             else:
                 apply_like_search(where, params, q)
 
@@ -683,7 +681,7 @@ def cached_browse_page(
         current_page = min(page, total_pages)
         offset = (current_page - 1) * per_page
 
-        order_sql = sort_clause(sort, use_fts and bool(q), include_time)
+        order_sql = sort_clause(sort, include_time)
         time_select_sql = 'm."time" AS "time"' if include_time else 'NULL AS "time"'
         list_sql = f"""
             SELECT
@@ -725,7 +723,7 @@ def browse() -> str:
 
     sort = clean_string(request.args.get("sort"))
     if sort not in ALLOWED_SORT:
-        sort = "relevance" if q else "date_desc"
+        sort = "date_asc"
 
     page = max(1, to_int(request.args.get("page"), 1) or 1)
     per_page = to_int(request.args.get("per_page"), PER_PAGE_DEFAULT) or PER_PAGE_DEFAULT

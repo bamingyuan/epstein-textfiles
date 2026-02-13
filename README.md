@@ -12,9 +12,8 @@ Date-first document browser and search UI for `pdf_messages.db`.
   - Current date view
   - Entire archive
 - Sorting:
-  - Relevance
-  - Date newest first
-  - Date oldest first
+  - Date/time oldest first (default)
+  - Date/time newest first
 - Dedicated "Undated" browsing mode
 - Clickable original source URL for each document
 - Full document permalink page
