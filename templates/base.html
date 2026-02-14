@@ -4,10 +4,272 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Document Browser{% endblock %}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <script>
+    (function () {
+      const STORAGE_KEY = "site:cookie-consent:v1";
+      const COOKIE_NAME = "site_cookie_consent";
+      const CONSENT_VERSION = 1;
+      const MAX_AGE_SECONDS = 60 * 60 * 24 * 180;
+
+      const defaultConsent = function () {
+        return {
+          version: CONSENT_VERSION,
+          necessary: true,
+          preferences: false,
+          analytics: false,
+          marketing: false,
+          updatedAt: null
+        };
+      };
+
+      const isBoolean = function (value) {
+        return value === true || value === false;
+      };
+
+      const normalizeConsent = function (value) {
+        if (!value || typeof value !== "object") {
+          return defaultConsent();
+        }
+        if (!isBoolean(value.preferences) || !isBoolean(value.analytics) || !isBoolean(value.marketing)) {
+          return defaultConsent();
+        }
+        return {
+          version: CONSENT_VERSION,
+          necessary: true,
+          preferences: value.preferences,
+          analytics: value.analytics,
+          marketing: value.marketing,
+          updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : null
+        };
+      };
+
+      const readStoredConsent = function () {
+        try {
+          const raw = window.localStorage.getItem(STORAGE_KEY);
+          if (!raw) {
+            return defaultConsent();
+          }
+          return normalizeConsent(JSON.parse(raw));
+        } catch (error) {
+          return defaultConsent();
+        }
+      };
+
+      const writeCookie = function (consent) {
+        const compact = {
+          v: CONSENT_VERSION,
+          p: consent.preferences ? 1 : 0,
+          a: consent.analytics ? 1 : 0,
+          m: consent.marketing ? 1 : 0,
+          u: consent.updatedAt || ""
+        };
+        let cookieValue = COOKIE_NAME + "=" + encodeURIComponent(JSON.stringify(compact));
+        cookieValue += "; Max-Age=" + String(MAX_AGE_SECONDS) + "; Path=/; SameSite=Lax";
+        if (window.location.protocol === "https:") {
+          cookieValue += "; Secure";
+        }
+        document.cookie = cookieValue;
+      };
+
+      const persistConsent = function (consent) {
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(consent));
+        } catch (error) {
+          // localStorage may be unavailable (private mode / strict browser settings).
+        }
+        writeCookie(consent);
+      };
+
+      let currentConsent = readStoredConsent();
+
+      const applyConsent = function (consent) {
+        currentConsent = consent;
+        const root = document.documentElement;
+        root.setAttribute("data-consent-preferences", consent.preferences ? "granted" : "denied");
+        root.setAttribute("data-consent-analytics", consent.analytics ? "granted" : "denied");
+        root.setAttribute("data-consent-marketing", consent.marketing ? "granted" : "denied");
+        window.dispatchEvent(new CustomEvent("cookieconsent:updated", { detail: { ...consent } }));
+      };
+
+      const withDecision = function (options) {
+        return {
+          version: CONSENT_VERSION,
+          necessary: true,
+          preferences: Boolean(options.preferences),
+          analytics: Boolean(options.analytics),
+          marketing: Boolean(options.marketing),
+          updatedAt: new Date().toISOString()
+        };
+      };
+
+      window.cookieConsentManager = {
+        getConsent: function () {
+          return { ...currentConsent };
+        },
+        hasDecision: function () {
+          return Boolean(currentConsent.updatedAt);
+        },
+        canUseCategory: function (category) {
+          if (category === "necessary") {
+            return true;
+          }
+          return Boolean(currentConsent[category]);
+        },
+        acceptAll: function () {
+          const nextConsent = withDecision({ preferences: true, analytics: true, marketing: true });
+          persistConsent(nextConsent);
+          applyConsent(nextConsent);
+          if (typeof window.__hideCookieUI === "function") {
+            window.__hideCookieUI();
+          }
+        },
+        rejectOptional: function () {
+          const nextConsent = withDecision({ preferences: false, analytics: false, marketing: false });
+          persistConsent(nextConsent);
+          applyConsent(nextConsent);
+          if (typeof window.__hideCookieUI === "function") {
+            window.__hideCookieUI();
+          }
+        },
+        savePreferences: function (preferences, analytics, marketing) {
+          const nextConsent = withDecision({
+            preferences: preferences,
+            analytics: analytics,
+            marketing: marketing
+          });
+          persistConsent(nextConsent);
+          applyConsent(nextConsent);
+          if (typeof window.__hideCookieUI === "function") {
+            window.__hideCookieUI();
+          }
+        },
+        openPreferences: function () {
+          if (typeof window.__openCookiePreferences === "function") {
+            window.__openCookiePreferences();
+          }
+        }
+      };
+
+      applyConsent(currentConsent);
+
+      document.addEventListener("DOMContentLoaded", function () {
+        const banner = document.getElementById("cookie-banner");
+        const bannerCustomizeButton = document.getElementById("cookie-open-customize");
+        const bannerAcceptButton = document.getElementById("cookie-accept-all");
+        const bannerRejectButton = document.getElementById("cookie-reject-all");
+        const settingsTrigger = document.getElementById("cookie-settings-trigger");
+
+        const modal = document.getElementById("cookie-modal");
+        const modalBackdrop = document.getElementById("cookie-modal-backdrop");
+        const modalClose = document.getElementById("cookie-modal-close");
+        const modalSave = document.getElementById("cookie-save-selection");
+        const modalReject = document.getElementById("cookie-modal-reject");
+        const modalAccept = document.getElementById("cookie-modal-accept");
+        const preferencesInput = document.getElementById("cookie-pref-preferences");
+        const analyticsInput = document.getElementById("cookie-pref-analytics");
+        const marketingInput = document.getElementById("cookie-pref-marketing");
+
+        const syncModalInputs = function () {
+          if (!preferencesInput || !analyticsInput || !marketingInput) {
+            return;
+          }
+          const consent = window.cookieConsentManager.getConsent();
+          preferencesInput.checked = Boolean(consent.preferences);
+          analyticsInput.checked = Boolean(consent.analytics);
+          marketingInput.checked = Boolean(consent.marketing);
+        };
+
+        const closeModal = function () {
+          if (modal) {
+            modal.hidden = true;
+          }
+          if (modalBackdrop) {
+            modalBackdrop.hidden = true;
+          }
+          document.body.classList.remove("cookie-modal-open");
+        };
+
+        const openModal = function () {
+          syncModalInputs();
+          if (modal) {
+            modal.hidden = false;
+          }
+          if (modalBackdrop) {
+            modalBackdrop.hidden = false;
+          }
+          document.body.classList.add("cookie-modal-open");
+        };
+
+        const hideBanner = function () {
+          if (banner) {
+            banner.hidden = true;
+          }
+        };
+
+        window.__openCookiePreferences = openModal;
+        window.__hideCookieUI = function () {
+          hideBanner();
+          closeModal();
+        };
+
+        if (banner && !window.cookieConsentManager.hasDecision()) {
+          banner.hidden = false;
+        }
+
+        if (settingsTrigger) {
+          settingsTrigger.hidden = false;
+          settingsTrigger.addEventListener("click", openModal);
+        }
+        if (bannerCustomizeButton) {
+          bannerCustomizeButton.addEventListener("click", openModal);
+        }
+        if (bannerAcceptButton) {
+          bannerAcceptButton.addEventListener("click", function () {
+            window.cookieConsentManager.acceptAll();
+          });
+        }
+        if (bannerRejectButton) {
+          bannerRejectButton.addEventListener("click", function () {
+            window.cookieConsentManager.rejectOptional();
+          });
+        }
+        if (modalClose) {
+          modalClose.addEventListener("click", closeModal);
+        }
+        if (modalBackdrop) {
+          modalBackdrop.addEventListener("click", closeModal);
+        }
+        if (modalSave) {
+          modalSave.addEventListener("click", function () {
+            window.cookieConsentManager.savePreferences(
+              preferencesInput && preferencesInput.checked,
+              analyticsInput && analyticsInput.checked,
+              marketingInput && marketingInput.checked
+            );
+          });
+        }
+        if (modalReject) {
+          modalReject.addEventListener("click", function () {
+            window.cookieConsentManager.rejectOptional();
+          });
+        }
+        if (modalAccept) {
+          modalAccept.addEventListener("click", function () {
+            window.cookieConsentManager.acceptAll();
+          });
+        }
+
+        document.addEventListener("keydown", function (event) {
+          if (event.key === "Escape" && modal && !modal.hidden) {
+            closeModal();
+          }
+        });
+
+        window.addEventListener("cookieconsent:updated", syncModalInputs);
+      });
+    })();
+  </script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
   <header class="site-header">
@@ -19,5 +281,56 @@
   <main class="page-shell {% block page_shell_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
+  <button type="button" class="cookie-settings-trigger" id="cookie-settings-trigger" hidden>Cookie Settings</button>
+
+  <section class="cookie-banner" id="cookie-banner" hidden aria-live="polite">
+    <div class="cookie-banner-copy">
+      <h2>Cookie Preferences</h2>
+      <p>
+        We only use required cookies by default. Optional cookies for preferences, analytics, and marketing are off until you choose.
+      </p>
+    </div>
+    <div class="cookie-actions">
+      <button type="button" id="cookie-reject-all" class="cookie-btn secondary">Reject Optional</button>
+      <button type="button" id="cookie-open-customize" class="cookie-btn ghost">Customize</button>
+      <button type="button" id="cookie-accept-all" class="cookie-btn primary">Accept All</button>
+    </div>
+  </section>
+
+  <div class="cookie-modal-backdrop" id="cookie-modal-backdrop" hidden></div>
+  <section class="cookie-modal" id="cookie-modal" role="dialog" aria-modal="true" aria-labelledby="cookie-modal-title" hidden>
+    <div class="cookie-modal-head">
+      <h2 id="cookie-modal-title">Cookie Settings</h2>
+      <button type="button" id="cookie-modal-close" class="cookie-close" aria-label="Close cookie settings">Close</button>
+    </div>
+    <p class="cookie-modal-intro">
+      Essential cookies keep the site running and are always active. Choose which optional categories to allow.
+    </p>
+    <div class="cookie-category">
+      <label for="cookie-pref-essential">Essential</label>
+      <input id="cookie-pref-essential" type="checkbox" checked disabled>
+      <p>Required for core functionality and security.</p>
+    </div>
+    <div class="cookie-category">
+      <label for="cookie-pref-preferences">Preferences</label>
+      <input id="cookie-pref-preferences" type="checkbox">
+      <p>Remembers UI choices such as list scroll position and convenience settings.</p>
+    </div>
+    <div class="cookie-category">
+      <label for="cookie-pref-analytics">Analytics</label>
+      <input id="cookie-pref-analytics" type="checkbox">
+      <p>Helps us understand site usage to improve performance and content.</p>
+    </div>
+    <div class="cookie-category">
+      <label for="cookie-pref-marketing">Marketing</label>
+      <input id="cookie-pref-marketing" type="checkbox">
+      <p>Allows personalized campaigns and conversion measurement.</p>
+    </div>
+    <div class="cookie-modal-actions">
+      <button type="button" id="cookie-modal-reject" class="cookie-btn secondary">Reject Optional</button>
+      <button type="button" id="cookie-save-selection" class="cookie-btn ghost">Save Selection</button>
+      <button type="button" id="cookie-modal-accept" class="cookie-btn primary">Accept All</button>
+    </div>
+  </section>
 </body>
 </html>

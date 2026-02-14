@@ -17,7 +17,7 @@
 
 body {
   margin: 0;
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
   color: var(--ink);
   background:
     radial-gradient(circle at top right, #efe6cf 0%, rgba(239, 230, 207, 0) 45%),
@@ -273,7 +273,7 @@ a {
   gap: 0.42rem;
   color: var(--ink-soft);
   cursor: pointer;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "IBM Plex Mono", "Cascadia Mono", monospace;
 }
 
 .date-option input[type="checkbox"] {
@@ -288,7 +288,7 @@ a {
 
 .date-section li a {
   text-decoration: none;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "IBM Plex Mono", "Cascadia Mono", monospace;
   color: var(--ink-soft);
   padding: 0.1rem 0.25rem;
   border-radius: 4px;
@@ -386,7 +386,7 @@ a {
   gap: 0.4rem;
   font-size: 0.78rem;
   color: var(--ink-soft);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "IBM Plex Mono", "Cascadia Mono", monospace;
 }
 
 .pager {
@@ -518,7 +518,7 @@ pre {
   padding: 0.65rem;
   max-height: 45vh;
   overflow: auto;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: "IBM Plex Mono", "Cascadia Mono", monospace;
   font-size: 0.79rem;
   line-height: 1.35;
 }
@@ -549,6 +549,166 @@ strong.message-structure {
 
 .muted {
   color: var(--ink-soft);
+}
+
+.cookie-settings-trigger {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 1000;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.82rem;
+  padding: 0.45rem 0.75rem;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+.cookie-banner {
+  position: fixed;
+  left: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 1100;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: 0 12px 30px rgba(24, 23, 19, 0.18);
+  padding: 0.9rem 1rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.cookie-banner-copy h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.cookie-banner-copy p {
+  margin: 0.3rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  max-width: 62ch;
+}
+
+.cookie-actions,
+.cookie-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cookie-btn {
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  min-height: 2.1rem;
+  padding: 0.35rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.cookie-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent-strong);
+  color: #fff;
+}
+
+.cookie-btn.secondary {
+  background: #fff;
+  color: var(--ink);
+}
+
+.cookie-btn.ghost {
+  background: #f6f4ee;
+  color: var(--ink);
+}
+
+.cookie-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(16, 17, 18, 0.45);
+}
+
+.cookie-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1210;
+  width: min(640px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: 0 18px 44px rgba(24, 23, 19, 0.28);
+  padding: 1rem;
+}
+
+.cookie-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.cookie-modal-head h2 {
+  margin: 0;
+}
+
+.cookie-close {
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #fff;
+  padding: 0.32rem 0.55rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.cookie-modal-intro {
+  color: var(--ink-soft);
+  margin: 0.55rem 0 0.8rem;
+}
+
+.cookie-category {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.6rem 0.7rem;
+  margin-bottom: 0.55rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.2rem 0.65rem;
+  align-items: center;
+}
+
+.cookie-category label {
+  font-weight: 600;
+}
+
+.cookie-category input {
+  width: 1rem;
+  height: 1rem;
+}
+
+.cookie-category p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+body.cookie-modal-open {
+  overflow: hidden;
 }
 
 @media (max-width: 1200px) {
@@ -608,5 +768,22 @@ strong.message-structure {
 
   pre {
     max-height: 35vh;
+  }
+
+  .cookie-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .cookie-actions {
+    width: 100%;
+  }
+
+  .cookie-actions .cookie-btn {
+    flex: 1 1 160px;
+  }
+
+  .cookie-settings-trigger {
+    bottom: 0.75rem;
+    right: 0.75rem;
   }
 }

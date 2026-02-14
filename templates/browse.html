@@ -230,16 +230,49 @@
       return;
     }
 
+    const consentManager = window.cookieConsentManager;
+    const canUsePreferenceStorage = !consentManager || consentManager.canUseCategory("preferences");
+    const readSession = function (key) {
+      if (!canUsePreferenceStorage) {
+        return null;
+      }
+      try {
+        return sessionStorage.getItem(key);
+      } catch (error) {
+        return null;
+      }
+    };
+    const writeSession = function (key, value) {
+      if (!canUsePreferenceStorage) {
+        return;
+      }
+      try {
+        sessionStorage.setItem(key, value);
+      } catch (error) {
+        // Ignore storage failures (blocked storage / quota limits).
+      }
+    };
+    const removeSession = function (key) {
+      if (!canUsePreferenceStorage) {
+        return;
+      }
+      try {
+        sessionStorage.removeItem(key);
+      } catch (error) {
+        // Ignore storage failures (blocked storage / quota limits).
+      }
+    };
+
     const keyUrl = new URL(window.location.href);
     keyUrl.searchParams.delete("doc");
     const storageKey = "browse:list-scroll:" + keyUrl.pathname + "?" + keyUrl.searchParams.toString();
     const keyboardNavFlagKey = storageKey + ":keyboard-nav";
-    const shouldFocusActiveRow = sessionStorage.getItem(keyboardNavFlagKey) === "1";
+    const shouldFocusActiveRow = readSession(keyboardNavFlagKey) === "1";
     if (shouldFocusActiveRow) {
-      sessionStorage.removeItem(keyboardNavFlagKey);
+      removeSession(keyboardNavFlagKey);
     }
 
-    const savedScrollTop = sessionStorage.getItem(storageKey);
+    const savedScrollTop = readSession(storageKey);
     if (savedScrollTop !== null) {
       const parsed = Number(savedScrollTop);
       if (Number.isFinite(parsed)) {
@@ -250,7 +283,7 @@
     }
 
     const saveScroll = function () {
-      sessionStorage.setItem(storageKey, String(list.scrollTop));
+      writeSession(storageKey, String(list.scrollTop));
     };
 
     if (shouldFocusActiveRow) {
@@ -264,11 +297,13 @@
       });
     }
 
-    list.addEventListener("scroll", saveScroll, { passive: true });
-    window.addEventListener("beforeunload", saveScroll);
-    document.querySelectorAll(".doc-row-link").forEach(function (link) {
-      link.addEventListener("click", saveScroll);
-    });
+    if (canUsePreferenceStorage) {
+      list.addEventListener("scroll", saveScroll, { passive: true });
+      window.addEventListener("beforeunload", saveScroll);
+      document.querySelectorAll(".doc-row-link").forEach(function (link) {
+        link.addEventListener("click", saveScroll);
+      });
+    }
 
     const links = Array.from(document.querySelectorAll(".doc-row-link"));
     const messagePane = document.querySelector(".preview-message");
@@ -339,7 +374,7 @@
       }
 
       event.preventDefault();
-      sessionStorage.setItem(keyboardNavFlagKey, "1");
+      writeSession(keyboardNavFlagKey, "1");
       saveScroll();
       window.location.assign(links[nextIndex].href);
     });
