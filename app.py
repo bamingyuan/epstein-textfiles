@@ -511,23 +511,21 @@ def build_browse_filters(
         where.append(undated_clause("m"))
         return where, params
 
+    # "Dated" browse mode should always exclude undated rows, even for "All dates".
+    where.append(date_exists_clause("m"))
+
     if day is not None and year is not None and month is not None:
-        where.append(date_exists_clause("m"))
         start, end = day_range(year, month, day)
         where.append('m."date" >= ? AND m."date" < ?')
         params.extend([start, end])
     elif month is not None and year is not None:
-        where.append(date_exists_clause("m"))
         start, end = date_range(year, month)
         where.append('m."date" >= ? AND m."date" < ?')
         params.extend([start, end])
     elif year is not None:
-        where.append(date_exists_clause("m"))
         start, end = date_range(year)
         where.append('m."date" >= ? AND m."date" < ?')
         params.extend([start, end])
-    elif scope == "current":
-        where.append(date_exists_clause("m"))
     return where, params
 
 
