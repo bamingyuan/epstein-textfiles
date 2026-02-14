@@ -51,6 +51,8 @@ PER_PAGE_MAX = 100
 
 ALLOWED_SCOPE = {"current", "all"}
 ALLOWED_SORT = {"date_desc", "date_asc"}
+MAX_BROWSE_YEAR = 2019
+DEFAULT_SELECTED_YEARS = (2016, 2017, 2018, 2019)
 
 SEARCH_INDEX_SQL = [
     'CREATE INDEX IF NOT EXISTS idx_messages_date ON messages("date")',
@@ -448,7 +450,7 @@ def normalize_period(
     if undated:
         return (), (), ()
 
-    years = tuple(sorted({year for year in years if 1 <= year <= 9999}))
+    years = tuple(sorted({year for year in years if 1 <= year <= MAX_BROWSE_YEAR}))
     months = tuple(sorted({month for month in months if 1 <= month <= 12}))
     days = tuple(sorted({day for day in days if 1 <= day <= 31}))
 
@@ -506,6 +508,8 @@ def build_browse_filters(
         clause, clause_params = build_integer_in_clause('CAST(SUBSTR(m."date", 1, 4) AS INTEGER)', years)
         where.append(clause)
         params.extend(clause_params)
+    where.append('CAST(SUBSTR(m."date", 1, 4) AS INTEGER) <= ?')
+    params.append(MAX_BROWSE_YEAR)
     if months:
         clause, clause_params = build_integer_in_clause('CAST(SUBSTR(m."date", 6, 2) AS INTEGER)', months)
         where.append(clause)
@@ -587,8 +591,8 @@ def year_counts(
     q: str,
     fts_enabled: bool,
 ) -> list[sqlite3.Row]:
-    where = [date_exists_clause("m")]
-    params: list[object] = []
+    where = [date_exists_clause("m"), 'CAST(SUBSTR(m."date", 1, 4) AS INTEGER) <= ?']
+    params: list[object] = [MAX_BROWSE_YEAR]
     from_sql = "messages m"
     if dataset:
         where.append('m."dataset" = ?')
@@ -817,6 +821,9 @@ def browse() -> str:
     selected_months = parse_multi_int_values(request.args.getlist("month"))
     selected_days = parse_multi_int_values(request.args.getlist("day"))
     selected_doc_id = to_int(request.args.get("doc"))
+
+    if not undated and scope == "current" and not selected_years and "year" not in request.args:
+        selected_years = DEFAULT_SELECTED_YEARS
 
     selected_years, selected_months, selected_days = normalize_period(
         conn,

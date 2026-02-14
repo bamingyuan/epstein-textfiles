@@ -292,6 +292,11 @@
         closeDrawer();
       }
     });
+
+    const hasQueryParams = Array.from(new URLSearchParams(window.location.search).keys()).length > 0;
+    if (!hasQueryParams) {
+      openDrawer();
+    }
   })();
 
   (function () {
