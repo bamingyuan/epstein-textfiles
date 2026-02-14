@@ -1,14 +1,17 @@
 :root {
-  --bg: #f7f5ef;
-  --paper: #fffdfa;
-  --ink: #1b1c1d;
-  --ink-soft: #4d5257;
-  --line: #d9d3c6;
-  --line-strong: #b8af9c;
-  --accent: #0f6e6e;
-  --accent-strong: #0b4f4f;
-  --warn: #a33a2f;
-  --shadow: 0 8px 22px rgba(23, 22, 18, 0.08);
+  --bg: #f5f7fa;
+  --paper: #fff;
+  --ink: #1b1b1b;
+  --ink-soft: #565c65;
+  --line: #dfe1e2;
+  --line-strong: #a9aeb1;
+  --accent: #005ea2;
+  --accent-strong: #1a4480;
+  --accent-active: #162e51;
+  --accent-soft: #d9e8f6;
+  --warn: #b50909;
+  --focus: #2491ff;
+  --shadow: 0 8px 22px rgba(22, 46, 81, 0.12);
 }
 
 * {
@@ -24,8 +27,8 @@ body {
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
   color: var(--ink);
   background:
-    radial-gradient(circle at top right, #efe6cf 0%, rgba(239, 230, 207, 0) 45%),
-    radial-gradient(circle at bottom left, #dce9df 0%, rgba(220, 233, 223, 0) 45%),
+    radial-gradient(circle at top right, #d9e8f6 0%, rgba(217, 232, 246, 0) 45%),
+    radial-gradient(circle at bottom left, #e9eef5 0%, rgba(233, 238, 245, 0) 45%),
     var(--bg);
 }
 
@@ -38,13 +41,16 @@ body.browse-page {
 }
 
 a {
+  color: var(--accent);
+}
+
+a:hover {
   color: var(--accent-strong);
 }
 
 .site-header {
-  border-bottom: 1px solid var(--line);
-  background: linear-gradient(125deg, rgba(255, 253, 247, 0.95), rgba(247, 242, 228, 0.95));
-  backdrop-filter: blur(2px);
+  border-bottom: 1px solid var(--accent-active);
+  background: linear-gradient(125deg, #162e51, #1a4480);
 }
 
 .brand {
@@ -59,7 +65,7 @@ a {
 }
 
 .brand h1 a {
-  color: var(--ink);
+  color: #fff;
   text-decoration: none;
 }
 
@@ -154,24 +160,38 @@ a {
   cursor: pointer;
 }
 
+.search-form button:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-active);
+}
+
+.search-form button:active {
+  background: var(--accent-active);
+}
+
+.search-form button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 1px;
+}
+
 .search-form .filter-toggle-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  background: linear-gradient(160deg, #0f7f7f, #0b5a5a);
+  background: linear-gradient(160deg, var(--accent), var(--accent-strong));
   color: #fff;
-  border-color: #084141;
+  border-color: var(--accent-active);
   font-weight: 600;
-  box-shadow: 0 8px 18px rgba(11, 79, 79, 0.25);
+  box-shadow: 0 8px 18px rgba(22, 46, 81, 0.25);
 }
 
 .search-form .filter-toggle-button:hover {
-  background: linear-gradient(160deg, #109090, #0c6666);
+  background: linear-gradient(160deg, var(--accent-strong), var(--accent-active));
 }
 
 .search-form .filter-toggle-button:focus-visible {
-  outline: 2px solid #0c6666;
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -215,7 +235,7 @@ a {
   position: fixed;
   inset: 0;
   z-index: 930;
-  background: rgba(17, 19, 21, 0.45);
+  background: rgba(22, 46, 81, 0.45);
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -233,7 +253,7 @@ a {
   z-index: 940;
   border-right: 1px solid var(--line-strong);
   background: var(--paper);
-  box-shadow: 0 18px 44px rgba(24, 23, 19, 0.24);
+  box-shadow: 0 18px 44px rgba(22, 46, 81, 0.24);
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -248,7 +268,7 @@ a {
 .filter-drawer-head {
   border-bottom: 1px solid var(--line);
   padding: 0.85rem 1rem;
-  background: linear-gradient(180deg, #fffef8, #f7f3e8);
+  background: linear-gradient(180deg, #fff, #eef4fb);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -323,7 +343,7 @@ body.filters-open {
 .control-panel-list {
   border-bottom: 1px solid var(--line);
   padding: 0.6rem 0.7rem;
-  background: linear-gradient(180deg, #fffef8, #f7f3e8);
+  background: linear-gradient(180deg, #fff, #eef4fb);
 }
 
 .control-panel-list .search-form {
@@ -371,7 +391,7 @@ body.filters-open {
 .pane-header {
   border-bottom: 1px solid var(--line);
   padding: 0.75rem 0.9rem;
-  background: linear-gradient(180deg, #fffef8, #f7f3e8);
+  background: linear-gradient(180deg, #fff, #eef4fb);
 }
 
 .pane-header h2 {
@@ -654,7 +674,7 @@ body.filters-open {
   padding: 0.38rem 0.5rem;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffdf8;
+  background: #f7faff;
 }
 
 .pane-preview .doc-preview .preview-meta dt {
@@ -754,13 +774,43 @@ dd {
 
 .button-link.secondary {
   background: #fff;
-  color: var(--accent-strong);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.button-link:hover,
+.date-filter-actions button:hover,
+.cookie-btn.primary:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-active);
+  color: #fff;
+}
+
+.button-link:active,
+.date-filter-actions button:active,
+.cookie-btn.primary:active {
+  background: var(--accent-active);
+}
+
+.button-link.secondary:hover {
+  background: var(--accent-soft);
+  color: var(--accent-active);
+}
+
+.button-link:focus-visible,
+.date-filter-actions button:focus-visible,
+.cookie-btn:focus-visible,
+.cookie-close:focus-visible,
+.filter-close-button:focus-visible,
+.cookie-settings-trigger:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 pre {
   white-space: pre-wrap;
   word-break: break-word;
-  background: #fcfaf3;
+  background: #f8fafc;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0.65rem;
@@ -772,7 +822,7 @@ pre {
 }
 
 mark.search-highlight {
-  background: #fff176;
+  background: #fee685;
   color: inherit;
   border-radius: 2px;
   padding: 0 0.08em;
@@ -824,7 +874,7 @@ strong.message-structure {
   border: 1px solid var(--line-strong);
   border-radius: 14px;
   background: var(--paper);
-  box-shadow: 0 12px 30px rgba(24, 23, 19, 0.18);
+  box-shadow: 0 12px 30px rgba(22, 46, 81, 0.18);
   padding: 0.9rem 1rem;
   display: grid;
   grid-template-columns: 1fr auto;
@@ -874,7 +924,7 @@ strong.message-structure {
 }
 
 .cookie-btn.ghost {
-  background: #f6f4ee;
+  background: var(--accent-soft);
   color: var(--ink);
 }
 
@@ -882,7 +932,7 @@ strong.message-structure {
   position: fixed;
   inset: 0;
   z-index: 1200;
-  background: rgba(16, 17, 18, 0.45);
+  background: rgba(22, 46, 81, 0.45);
 }
 
 .cookie-modal {
@@ -897,7 +947,7 @@ strong.message-structure {
   border: 1px solid var(--line-strong);
   border-radius: 14px;
   background: var(--paper);
-  box-shadow: 0 18px 44px rgba(24, 23, 19, 0.28);
+  box-shadow: 0 18px 44px rgba(22, 46, 81, 0.28);
   padding: 1rem;
 }
 
