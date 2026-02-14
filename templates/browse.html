@@ -30,10 +30,18 @@
       <option value="date_desc" {% if sort == "date_desc" %}selected{% endif %}>Date/time newest first</option>
     </select>
 
-    <input type="hidden" name="year" value="{{ year or '' }}">
-    <input type="hidden" name="month" value="{{ month or '' }}">
-    <input type="hidden" name="day" value="{{ day or '' }}">
-    <input type="hidden" name="undated" value="{{ 1 if undated else '' }}">
+    {% for selected_year in selected_years %}
+    <input type="hidden" name="year" value="{{ selected_year }}">
+    {% endfor %}
+    {% for selected_month in selected_months %}
+    <input type="hidden" name="month" value="{{ selected_month }}">
+    {% endfor %}
+    {% for selected_day in selected_days %}
+    <input type="hidden" name="day" value="{{ selected_day }}">
+    {% endfor %}
+    {% if undated %}
+    <input type="hidden" name="undated" value="1">
+    {% endif %}
     <input type="hidden" name="per_page" value="{{ per_page }}">
 
     <button type="submit">Apply</button>
@@ -56,65 +64,77 @@
     <div class="pane-header">
       <h2>Browse By Date</h2>
       <div class="browse-tabs">
-        <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='current', sort=sort, year=year, month=month, day=day, per_page=per_page) }}" class="{% if not undated %}active{% endif %}">Dated</a>
-        <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, undated=1, per_page=per_page) }}" class="{% if undated %}active{% endif %}">Undated</a>
+        <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='current', sort=sort, year=selected_years or None, month=selected_months or None, day=selected_days or None, per_page=per_page) }}" class="{% if not undated %}active{% endif %}">Dated</a>
+        <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=selected_years or None, month=selected_months or None, day=selected_days or None, undated=1, per_page=per_page) }}" class="{% if undated %}active{% endif %}">Undated</a>
       </div>
     </div>
 
     {% if not undated %}
-    <div class="date-section date-section-years">
-      <h3>Years</h3>
-      <ul>
-        <li>
-          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='all', sort=sort, per_page=per_page) }}" class="{% if not year and not month and not day %}active{% endif %}">
-            All dates
-          </a>
-        </li>
-        {% for y in years %}
-        {% set year_active = y['year'] == year %}
-        <li>
-          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='all' if year_active else 'current', sort=sort, year=None if year_active else y['year'], month=None, day=None, per_page=per_page) }}" class="{% if year_active %}active{% endif %}">
-            {{ y["year"] }}
-          </a>
-          <span>{{ y["count"] }}</span>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
+    <form method="get" action="{{ url_for('browse') }}" class="date-filter-form">
+      <input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="dataset" value="{{ dataset or '' }}">
+      <input type="hidden" name="scope" value="current">
+      <input type="hidden" name="sort" value="{{ sort }}">
+      <input type="hidden" name="per_page" value="{{ per_page }}">
 
-    {% if year %}
-    <div class="date-section date-section-months">
-      <h3>Months</h3>
-      <ul>
-        {% for m in months %}
-        {% set month_active = m['month'] == month %}
-        <li>
-          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='current', sort=sort, year=year, month=None if month_active else m['month'], day=None, per_page=per_page) }}" class="{% if month_active %}active{% endif %}">
-            {{ "%02d"|format(m["month"]) }}
-          </a>
-          <span>{{ m["count"] }}</span>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endif %}
+      <div class="date-section date-section-years">
+        <h3>Years</h3>
+        <ul>
+          {% for y in years %}
+          <li>
+            <label class="date-option">
+              <input type="checkbox" name="year" value="{{ y['year'] }}" {% if y['year'] in selected_years %}checked{% endif %}>
+              <span class="date-value">{{ y["year"] }}</span>
+            </label>
+            <span>{{ y["count"] }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
 
-    {% if year and month %}
-    <div class="date-section date-section-days">
-      <h3>Days</h3>
-      <ul>
-        {% for d in days %}
-        {% set day_active = d['day'] == day %}
-        <li>
-          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='current', sort=sort, year=year, month=month, day=None if day_active else d['day'], per_page=per_page) }}" class="{% if day_active %}active{% endif %}">
-            {{ "%02d"|format(d["day"]) }}
-          </a>
-          <span>{{ d["count"] }}</span>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endif %}
+      <div class="date-section date-section-months">
+        <h3>Months</h3>
+        {% if selected_years %}
+        <ul>
+          {% for m in months %}
+          <li>
+            <label class="date-option">
+              <input type="checkbox" name="month" value="{{ m['month'] }}" {% if m['month'] in selected_months %}checked{% endif %}>
+              <span class="date-value">{{ "%02d"|format(m["month"]) }}</span>
+            </label>
+            <span>{{ m["count"] }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="muted">Select at least one year to choose months.</p>
+        {% endif %}
+      </div>
+
+      <div class="date-section date-section-days">
+        <h3>Days</h3>
+        {% if selected_years and selected_months %}
+        <ul>
+          {% for d in days %}
+          <li>
+            <label class="date-option">
+              <input type="checkbox" name="day" value="{{ d['day'] }}" {% if d['day'] in selected_days %}checked{% endif %}>
+              <span class="date-value">{{ "%02d"|format(d["day"]) }}</span>
+            </label>
+            <span>{{ d["count"] }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="muted">Select year and month values to choose days.</p>
+        {% endif %}
+      </div>
+
+      <div class="date-section date-filter-actions">
+        <button type="submit">Apply Date Filters</button>
+        <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='all', sort=sort, per_page=per_page) }}">All dates</a>
+      </div>
+    </form>
     {% else %}
     <div class="date-section">
       <h3>Undated archive</h3>
@@ -131,7 +151,7 @@
     <div class="list-scroll">
       {% for row in rows %}
       <article class="doc-row {% if selected_doc_id == row['id'] %}active{% endif %}">
-        <a class="doc-row-link" href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=year, month=month, day=day, undated=1 if undated else None, per_page=per_page, page=page, doc=row['id']) }}">
+        <a class="doc-row-link" href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=selected_years or None, month=selected_months or None, day=selected_days or None, undated=1 if undated else None, per_page=per_page, page=page, doc=row['id']) }}">
           <div class="doc-meta">
             {% set row_date = row["date"]|display_date %}
             {% set row_time = row["time"]|display_time %}
@@ -151,13 +171,13 @@
 
     <nav class="pager">
       {% if page > 1 %}
-      <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=year, month=month, day=day, undated=1 if undated else None, per_page=per_page, page=page-1, doc=selected_doc_id) }}">Previous</a>
+      <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=selected_years or None, month=selected_months or None, day=selected_days or None, undated=1 if undated else None, per_page=per_page, page=page-1, doc=selected_doc_id) }}">Previous</a>
       {% else %}
       <span class="disabled">Previous</span>
       {% endif %}
 
       {% if page < total_pages %}
-      <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=year, month=month, day=day, undated=1 if undated else None, per_page=per_page, page=page+1, doc=selected_doc_id) }}">Next</a>
+      <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=selected_years or None, month=selected_months or None, day=selected_days or None, undated=1 if undated else None, per_page=per_page, page=page+1, doc=selected_doc_id) }}">Next</a>
       {% else %}
       <span class="disabled">Next</span>
       {% endif %}

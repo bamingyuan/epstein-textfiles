@@ -4,7 +4,7 @@ import os
 import re
 import shlex
 import sqlite3
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from functools import lru_cache
 
 from flask import Flask, abort, g, render_template, request, url_for
@@ -149,6 +149,16 @@ def to_int(value: str | None, fallback: int | None = None) -> int | None:
         return int(value)
     except ValueError:
         return fallback
+
+
+def parse_multi_int_values(raw_values: list[str]) -> tuple[int, ...]:
+    values: set[int] = set()
+    for raw_value in raw_values:
+        for token in raw_value.split(","):
+            parsed = to_int(token.strip())
+            if parsed is not None:
+                values.add(parsed)
+    return tuple(sorted(values))
 
 
 def clean_string(value: str | None) -> str:
@@ -428,25 +438,25 @@ def get_latest_available_date(conn: sqlite3.Connection, dataset: str | None = No
 
 def normalize_period(
     conn: sqlite3.Connection,
-    year: int | None,
-    month: int | None,
-    day: int | None,
+    years: tuple[int, ...],
+    months: tuple[int, ...],
+    days: tuple[int, ...],
     undated: bool,
     dataset: str | None,
     scope: str,
-) -> tuple[int | None, int | None, int | None]:
+) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
     if undated:
-        return None, None, None
+        return (), (), ()
 
-    if year is None and month is not None:
-        month = None
-        day = None
-    if month is None and day is not None:
-        day = None
+    years = tuple(sorted({year for year in years if 1 <= year <= 9999}))
+    months = tuple(sorted({month for month in months if 1 <= month <= 12}))
+    days = tuple(sorted({day for day in days if 1 <= day <= 31}))
 
-    if year is None:
+    if not years:
+        months = ()
+        days = ()
         if scope != "current":
-            return None, None, None
+            return (), (), ()
         latest = get_latest_available_date(conn, dataset)
         if latest:
             latest_date = extract_date_portion(latest)
@@ -456,52 +466,30 @@ def normalize_period(
                 except ValueError:
                     latest_dt = None
                 if latest_dt is not None:
-                    return latest_dt.year, latest_dt.month, None
-        return None, None, None
+                    return (latest_dt.year,), (latest_dt.month,), ()
+        return (), (), ()
 
-    if month is not None and not 1 <= month <= 12:
-        month = None
-        day = None
-    if day is not None and not 1 <= day <= 31:
-        day = None
-    if year is not None and month is not None and day is not None:
-        try:
-            date(year, month, day)
-        except ValueError:
-            day = None
+    if not months:
+        days = ()
 
-    return year, month, day
+    return years, months, days
 
 
-def date_range(year: int, month: int | None = None) -> tuple[str, str]:
-    if month is None:
-        start = date(year, 1, 1)
-        end = date(year + 1, 1, 1)
-        return start.isoformat(), end.isoformat()
-    start = date(year, month, 1)
-    if month == 12:
-        end = date(year + 1, 1, 1)
-    else:
-        end = date(year, month + 1, 1)
-    return start.isoformat(), end.isoformat()
-
-
-def day_range(year: int, month: int, day: int) -> tuple[str, str]:
-    start = date(year, month, day)
-    end = start + timedelta(days=1)
-    return start.isoformat(), end.isoformat()
+def build_integer_in_clause(expression: str, values: tuple[int, ...]) -> tuple[str, list[object]]:
+    placeholders = ", ".join("?" for _ in values)
+    return f"{expression} IN ({placeholders})", [*values]
 
 
 def build_browse_filters(
     dataset: str | None,
     scope: str,
-    year: int | None,
-    month: int | None,
-    day: int | None,
+    years: tuple[int, ...],
+    months: tuple[int, ...],
+    days: tuple[int, ...],
     undated: bool,
-) -> tuple[list[str], list[str]]:
+) -> tuple[list[str], list[object]]:
     where = ["1=1"]
-    params: list[str] = []
+    params: list[object] = []
 
     if dataset:
         where.append('m."dataset" = ?')
@@ -514,22 +502,23 @@ def build_browse_filters(
     # "Dated" browse mode should always exclude undated rows, even for "All dates".
     where.append(date_exists_clause("m"))
 
-    if day is not None and year is not None and month is not None:
-        start, end = day_range(year, month, day)
-        where.append('m."date" >= ? AND m."date" < ?')
-        params.extend([start, end])
-    elif month is not None and year is not None:
-        start, end = date_range(year, month)
-        where.append('m."date" >= ? AND m."date" < ?')
-        params.extend([start, end])
-    elif year is not None:
-        start, end = date_range(year)
-        where.append('m."date" >= ? AND m."date" < ?')
-        params.extend([start, end])
+    if years:
+        clause, clause_params = build_integer_in_clause('CAST(SUBSTR(m."date", 1, 4) AS INTEGER)', years)
+        where.append(clause)
+        params.extend(clause_params)
+    if months:
+        clause, clause_params = build_integer_in_clause('CAST(SUBSTR(m."date", 6, 2) AS INTEGER)', months)
+        where.append(clause)
+        params.extend(clause_params)
+    if days:
+        clause, clause_params = build_integer_in_clause('CAST(SUBSTR(m."date", 9, 2) AS INTEGER)', days)
+        where.append(clause)
+        params.extend(clause_params)
+
     return where, params
 
 
-def apply_like_search(where: list[str], params: list[str], query: str) -> None:
+def apply_like_search(where: list[str], params: list[object], query: str) -> None:
     terms = parse_search_terms(query)
     for term in terms:
         like = f"%{term}%"
@@ -588,11 +577,14 @@ def year_counts(conn: sqlite3.Connection, dataset: str | None) -> list[sqlite3.R
     return conn.execute(query, params).fetchall()
 
 
-def month_counts(conn: sqlite3.Connection, year: int | None, dataset: str | None) -> list[sqlite3.Row]:
-    if year is None:
+def month_counts(conn: sqlite3.Connection, years: tuple[int, ...], dataset: str | None) -> list[sqlite3.Row]:
+    if not years:
         return []
-    where = [date_exists_clause("messages"), 'SUBSTR("date", 1, 4) = ?']
-    params: list[str] = [f"{year:04d}"]
+    where = [date_exists_clause("messages")]
+    params: list[object] = []
+    year_clause, year_params = build_integer_in_clause('CAST(SUBSTR("date", 1, 4) AS INTEGER)', years)
+    where.append(year_clause)
+    params.extend(year_params)
     if dataset:
         where.append('"messages"."dataset" = ?')
         params.append(dataset)
@@ -607,13 +599,20 @@ def month_counts(conn: sqlite3.Connection, year: int | None, dataset: str | None
 
 
 def day_counts(
-    conn: sqlite3.Connection, year: int | None, month: int | None, dataset: str | None
+    conn: sqlite3.Connection,
+    years: tuple[int, ...],
+    months: tuple[int, ...],
+    dataset: str | None,
 ) -> list[sqlite3.Row]:
-    if year is None or month is None:
+    if not years or not months:
         return []
-    start, end = date_range(year, month)
-    where = [date_exists_clause("messages"), '"messages"."date" >= ? AND "messages"."date" < ?']
-    params: list[str] = [start, end]
+    where = [date_exists_clause("messages")]
+    params: list[object] = []
+    year_clause, year_params = build_integer_in_clause('CAST(SUBSTR("date", 1, 4) AS INTEGER)', years)
+    month_clause, month_params = build_integer_in_clause('CAST(SUBSTR("date", 6, 2) AS INTEGER)', months)
+    where.extend([year_clause, month_clause])
+    params.extend(year_params)
+    params.extend(month_params)
     if dataset:
         where.append('"messages"."dataset" = ?')
         params.append(dataset)
@@ -653,13 +652,13 @@ def cached_year_counts(
 
 @lru_cache(maxsize=512)
 def cached_month_counts(
-    db_path: str, cache_token: tuple[int, int], year: int | None, dataset: str | None
+    db_path: str, cache_token: tuple[int, int], years: tuple[int, ...], dataset: str | None
 ) -> tuple[dict[str, object], ...]:
-    if year is None:
+    if not years:
         return ()
     conn = open_db_connection(db_path)
     try:
-        return rows_to_dict_tuple(month_counts(conn, year, dataset))
+        return rows_to_dict_tuple(month_counts(conn, years, dataset))
     finally:
         conn.close()
 
@@ -668,15 +667,15 @@ def cached_month_counts(
 def cached_day_counts(
     db_path: str,
     cache_token: tuple[int, int],
-    year: int | None,
-    month: int | None,
+    years: tuple[int, ...],
+    months: tuple[int, ...],
     dataset: str | None,
 ) -> tuple[dict[str, object], ...]:
-    if year is None or month is None:
+    if not years or not months:
         return ()
     conn = open_db_connection(db_path)
     try:
-        return rows_to_dict_tuple(day_counts(conn, year, month, dataset))
+        return rows_to_dict_tuple(day_counts(conn, years, months, dataset))
     finally:
         conn.close()
 
@@ -692,14 +691,14 @@ def cached_browse_page(
     page: int,
     per_page: int,
     undated: bool,
-    year: int | None,
-    month: int | None,
-    day: int | None,
+    years: tuple[int, ...],
+    months: tuple[int, ...],
+    days: tuple[int, ...],
     include_time: bool,
 ) -> dict[str, object]:
     conn = open_db_connection(db_path)
     try:
-        where, params = build_browse_filters(dataset, scope, year, month, day, undated)
+        where, params = build_browse_filters(dataset, scope, years, months, days, undated)
         from_sql = "messages m"
         fts_enabled = cached_has_fts(db_path, cache_token)
 
@@ -768,12 +767,20 @@ def browse() -> str:
     per_page = max(10, min(PER_PAGE_MAX, per_page))
 
     undated = request.args.get("undated") == "1"
-    year = to_int(request.args.get("year"))
-    month = to_int(request.args.get("month"))
-    day = to_int(request.args.get("day"))
+    selected_years = parse_multi_int_values(request.args.getlist("year"))
+    selected_months = parse_multi_int_values(request.args.getlist("month"))
+    selected_days = parse_multi_int_values(request.args.getlist("day"))
     selected_doc_id = to_int(request.args.get("doc"))
 
-    year, month, day = normalize_period(conn, year, month, day, undated, dataset, scope)
+    selected_years, selected_months, selected_days = normalize_period(
+        conn,
+        selected_years,
+        selected_months,
+        selected_days,
+        undated,
+        dataset,
+        scope,
+    )
     cache_token = db_cache_token(DB_PATH)
     include_time = has_time_column(DB_PATH, cache_token)
     page_data = cached_browse_page(
@@ -786,9 +793,9 @@ def browse() -> str:
         page,
         per_page,
         undated,
-        year,
-        month,
-        day,
+        selected_years,
+        selected_months,
+        selected_days,
         include_time,
     )
     total = page_data["total"]
@@ -823,8 +830,8 @@ def browse() -> str:
         ).fetchone()
 
     years = cached_year_counts(DB_PATH, cache_token, dataset)
-    months = cached_month_counts(DB_PATH, cache_token, year, dataset)
-    days = cached_day_counts(DB_PATH, cache_token, year, month, dataset)
+    months = cached_month_counts(DB_PATH, cache_token, selected_years, dataset)
+    days = cached_day_counts(DB_PATH, cache_token, selected_years, selected_months, dataset)
     datasets = cached_dataset_counts(DB_PATH, cache_token)
 
     return render_template(
@@ -843,9 +850,9 @@ def browse() -> str:
         years=years,
         months=months,
         days=days,
-        year=year,
-        month=month,
-        day=day,
+        selected_years=selected_years,
+        selected_months=selected_months,
+        selected_days=selected_days,
         undated=undated,
         datasets=datasets,
         fts_enabled=page_data["fts_enabled"],

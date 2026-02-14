@@ -240,6 +240,13 @@ a {
   flex-direction: column;
 }
 
+.date-filter-form {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+}
+
 .pane-nav .date-section-days {
   flex: 1 1 auto;
   min-height: 0;
@@ -258,6 +265,25 @@ a {
   justify-content: space-between;
   align-items: center;
   margin: 0.12rem 0;
+}
+
+.date-option {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.date-option input[type="checkbox"] {
+  margin: 0;
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.date-option .date-value {
+  line-height: 1;
 }
 
 .date-section li a {
@@ -287,6 +313,29 @@ a {
 .date-section-years li span,
 .date-section-months li span {
   font-size: 0.72rem;
+}
+
+.date-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.date-filter-actions button {
+  border-radius: 8px;
+  border: 1px solid var(--accent-strong);
+  background: var(--accent);
+  color: #fff;
+  min-height: 2rem;
+  padding: 0.2rem 0.55rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.date-filter-actions a {
+  font-size: 0.82rem;
 }
 
 .list-scroll {
