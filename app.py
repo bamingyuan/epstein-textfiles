@@ -535,6 +535,26 @@ def apply_like_search(where: list[str], params: list[object], query: str) -> Non
         params.extend([like, like, like, like])
 
 
+def apply_search_filters(
+    from_sql: str,
+    where: list[str],
+    params: list[object],
+    query: str,
+    fts_enabled: bool,
+) -> str:
+    if not query:
+        return from_sql
+
+    fts_query = build_fts_query(query)
+    if fts_enabled and fts_query:
+        where.append("messages_fts MATCH ?")
+        params.append(fts_query)
+        return "messages m JOIN messages_fts ON messages_fts.rowid = m.id"
+
+    apply_like_search(where, params, query)
+    return from_sql
+
+
 def sort_clause(sort: str, include_time: bool) -> str:
     if include_time:
         # Keep rows without a time value at the end in both sort directions.
@@ -561,15 +581,23 @@ def dataset_counts(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     ).fetchall()
 
 
-def year_counts(conn: sqlite3.Connection, dataset: str | None) -> list[sqlite3.Row]:
-    where = [date_exists_clause("messages")]
-    params: list[str] = []
+def year_counts(
+    conn: sqlite3.Connection,
+    dataset: str | None,
+    q: str,
+    fts_enabled: bool,
+) -> list[sqlite3.Row]:
+    where = [date_exists_clause("m")]
+    params: list[object] = []
+    from_sql = "messages m"
     if dataset:
-        where.append('"messages"."dataset" = ?')
+        where.append('m."dataset" = ?')
         params.append(dataset)
+
+    from_sql = apply_search_filters(from_sql, where, params, q, fts_enabled)
     query = f"""
-        SELECT CAST(SUBSTR("date", 1, 4) AS INTEGER) AS year, COUNT(*) AS count
-        FROM messages
+        SELECT CAST(SUBSTR(m."date", 1, 4) AS INTEGER) AS year, COUNT(*) AS count
+        FROM {from_sql}
         WHERE {" AND ".join(where)}
         GROUP BY year
         ORDER BY year DESC
@@ -577,20 +605,29 @@ def year_counts(conn: sqlite3.Connection, dataset: str | None) -> list[sqlite3.R
     return conn.execute(query, params).fetchall()
 
 
-def month_counts(conn: sqlite3.Connection, years: tuple[int, ...], dataset: str | None) -> list[sqlite3.Row]:
+def month_counts(
+    conn: sqlite3.Connection,
+    years: tuple[int, ...],
+    dataset: str | None,
+    q: str,
+    fts_enabled: bool,
+) -> list[sqlite3.Row]:
     if not years:
         return []
-    where = [date_exists_clause("messages")]
+    where = [date_exists_clause("m")]
     params: list[object] = []
-    year_clause, year_params = build_integer_in_clause('CAST(SUBSTR("date", 1, 4) AS INTEGER)', years)
+    from_sql = "messages m"
+    year_clause, year_params = build_integer_in_clause('CAST(SUBSTR(m."date", 1, 4) AS INTEGER)', years)
     where.append(year_clause)
     params.extend(year_params)
     if dataset:
-        where.append('"messages"."dataset" = ?')
+        where.append('m."dataset" = ?')
         params.append(dataset)
+
+    from_sql = apply_search_filters(from_sql, where, params, q, fts_enabled)
     query = f"""
-        SELECT CAST(SUBSTR("date", 6, 2) AS INTEGER) AS month, COUNT(*) AS count
-        FROM messages
+        SELECT CAST(SUBSTR(m."date", 6, 2) AS INTEGER) AS month, COUNT(*) AS count
+        FROM {from_sql}
         WHERE {" AND ".join(where)}
         GROUP BY month
         ORDER BY month ASC
@@ -603,22 +640,27 @@ def day_counts(
     years: tuple[int, ...],
     months: tuple[int, ...],
     dataset: str | None,
+    q: str,
+    fts_enabled: bool,
 ) -> list[sqlite3.Row]:
     if not years or not months:
         return []
-    where = [date_exists_clause("messages")]
+    where = [date_exists_clause("m")]
     params: list[object] = []
-    year_clause, year_params = build_integer_in_clause('CAST(SUBSTR("date", 1, 4) AS INTEGER)', years)
-    month_clause, month_params = build_integer_in_clause('CAST(SUBSTR("date", 6, 2) AS INTEGER)', months)
+    from_sql = "messages m"
+    year_clause, year_params = build_integer_in_clause('CAST(SUBSTR(m."date", 1, 4) AS INTEGER)', years)
+    month_clause, month_params = build_integer_in_clause('CAST(SUBSTR(m."date", 6, 2) AS INTEGER)', months)
     where.extend([year_clause, month_clause])
     params.extend(year_params)
     params.extend(month_params)
     if dataset:
-        where.append('"messages"."dataset" = ?')
+        where.append('m."dataset" = ?')
         params.append(dataset)
+
+    from_sql = apply_search_filters(from_sql, where, params, q, fts_enabled)
     query = f"""
-        SELECT CAST(SUBSTR("date", 9, 2) AS INTEGER) AS day, COUNT(*) AS count
-        FROM messages
+        SELECT CAST(SUBSTR(m."date", 9, 2) AS INTEGER) AS day, COUNT(*) AS count
+        FROM {from_sql}
         WHERE {" AND ".join(where)}
         GROUP BY day
         ORDER BY day ASC
@@ -641,24 +683,33 @@ def cached_dataset_counts(db_path: str, cache_token: tuple[int, int]) -> tuple[d
 
 @lru_cache(maxsize=256)
 def cached_year_counts(
-    db_path: str, cache_token: tuple[int, int], dataset: str | None
+    db_path: str,
+    cache_token: tuple[int, int],
+    dataset: str | None,
+    q: str,
+    fts_enabled: bool,
 ) -> tuple[dict[str, object], ...]:
     conn = open_db_connection(db_path)
     try:
-        return rows_to_dict_tuple(year_counts(conn, dataset))
+        return rows_to_dict_tuple(year_counts(conn, dataset, q, fts_enabled))
     finally:
         conn.close()
 
 
 @lru_cache(maxsize=512)
 def cached_month_counts(
-    db_path: str, cache_token: tuple[int, int], years: tuple[int, ...], dataset: str | None
+    db_path: str,
+    cache_token: tuple[int, int],
+    years: tuple[int, ...],
+    dataset: str | None,
+    q: str,
+    fts_enabled: bool,
 ) -> tuple[dict[str, object], ...]:
     if not years:
         return ()
     conn = open_db_connection(db_path)
     try:
-        return rows_to_dict_tuple(month_counts(conn, years, dataset))
+        return rows_to_dict_tuple(month_counts(conn, years, dataset, q, fts_enabled))
     finally:
         conn.close()
 
@@ -670,12 +721,14 @@ def cached_day_counts(
     years: tuple[int, ...],
     months: tuple[int, ...],
     dataset: str | None,
+    q: str,
+    fts_enabled: bool,
 ) -> tuple[dict[str, object], ...]:
     if not years or not months:
         return ()
     conn = open_db_connection(db_path)
     try:
-        return rows_to_dict_tuple(day_counts(conn, years, months, dataset))
+        return rows_to_dict_tuple(day_counts(conn, years, months, dataset, q, fts_enabled))
     finally:
         conn.close()
 
@@ -702,14 +755,7 @@ def cached_browse_page(
         from_sql = "messages m"
         fts_enabled = cached_has_fts(db_path, cache_token)
 
-        if q:
-            fts_query = build_fts_query(q)
-            if fts_enabled and fts_query:
-                from_sql = "messages m JOIN messages_fts ON messages_fts.rowid = m.id"
-                where.append("messages_fts MATCH ?")
-                params.append(fts_query)
-            else:
-                apply_like_search(where, params, q)
+        from_sql = apply_search_filters(from_sql, where, params, q, fts_enabled)
 
         where_sql = " AND ".join(where)
         count_sql = f"SELECT COUNT(*) AS count FROM {from_sql} WHERE {where_sql}"
@@ -829,9 +875,13 @@ def browse() -> str:
             [selected_doc_id],
         ).fetchone()
 
-    years = cached_year_counts(DB_PATH, cache_token, dataset)
-    months = cached_month_counts(DB_PATH, cache_token, selected_years, dataset)
-    days = cached_day_counts(DB_PATH, cache_token, selected_years, selected_months, dataset)
+    years = cached_year_counts(DB_PATH, cache_token, dataset, q, page_data["fts_enabled"])
+    months = cached_month_counts(
+        DB_PATH, cache_token, selected_years, dataset, q, page_data["fts_enabled"]
+    )
+    days = cached_day_counts(
+        DB_PATH, cache_token, selected_years, selected_months, dataset, q, page_data["fts_enabled"]
+    )
     datasets = cached_dataset_counts(DB_PATH, cache_token)
 
     return render_template(
