@@ -5,30 +5,38 @@
 {% block content %}
 <section class="control-panel">
   <form method="get" action="{{ url_for('browse') }}" class="search-form">
-    <label for="q">Search</label>
-    <input id="q" type="text" name="q" value="{{ q }}" placeholder="Try: meeting minutes OR exact phrase in quotes">
+    <div class="form-field form-field-search">
+      <label for="q">Search</label>
+      <input id="q" type="text" name="q" value="{{ q }}" placeholder="Try: meeting minutes OR exact phrase in quotes">
+    </div>
 
-    <label for="dataset">Dataset</label>
-    <select id="dataset" name="dataset">
-      <option value="">All datasets</option>
-      {% for ds in datasets %}
-      <option value="{{ ds['dataset'] }}" {% if dataset == ds['dataset'] %}selected{% endif %}>
-        {{ ds["dataset"] }} ({{ ds["count"] }})
-      </option>
-      {% endfor %}
-    </select>
+    <div class="form-field">
+      <label for="dataset">Dataset</label>
+      <select id="dataset" name="dataset">
+        <option value="">All datasets</option>
+        {% for ds in datasets %}
+        <option value="{{ ds['dataset'] }}" {% if dataset == ds['dataset'] %}selected{% endif %}>
+          {{ ds["dataset"] }} ({{ ds["count"] }})
+        </option>
+        {% endfor %}
+      </select>
+    </div>
 
-    <label for="scope">Search Scope</label>
-    <select id="scope" name="scope">
-      <option value="current" {% if scope == "current" %}selected{% endif %}>Within current browse period</option>
-      <option value="all" {% if scope == "all" %}selected{% endif %}>All documents</option>
-    </select>
+    <div class="form-field">
+      <label for="scope">Search Scope</label>
+      <select id="scope" name="scope">
+        <option value="current" {% if scope == "current" %}selected{% endif %}>Within current browse period</option>
+        <option value="all" {% if scope == "all" %}selected{% endif %}>All documents</option>
+      </select>
+    </div>
 
-    <label for="sort">Sort</label>
-    <select id="sort" name="sort">
-      <option value="date_asc" {% if sort == "date_asc" %}selected{% endif %}>Date/time oldest first</option>
-      <option value="date_desc" {% if sort == "date_desc" %}selected{% endif %}>Date/time newest first</option>
-    </select>
+    <div class="form-field">
+      <label for="sort">Sort</label>
+      <select id="sort" name="sort">
+        <option value="date_asc" {% if sort == "date_asc" %}selected{% endif %}>Date/time oldest first</option>
+        <option value="date_desc" {% if sort == "date_desc" %}selected{% endif %}>Date/time newest first</option>
+      </select>
+    </div>
 
     {% for selected_year in selected_years %}
     <input type="hidden" name="year" value="{{ selected_year }}">
@@ -44,7 +52,12 @@
     {% endif %}
     <input type="hidden" name="per_page" value="{{ per_page }}">
 
-    <button type="submit">Apply</button>
+    <div class="form-actions">
+      <button type="button" class="filter-toggle-button" data-open-filters aria-controls="filter-drawer" aria-expanded="false">
+        Browse Filters
+      </button>
+      <button type="submit">Apply</button>
+    </div>
   </form>
 
   <div class="control-notes">
@@ -59,90 +72,99 @@
   </div>
 </section>
 
+<div class="filter-backdrop" id="filter-backdrop" hidden></div>
+<aside class="filter-drawer" id="filter-drawer" hidden>
+  <div class="filter-drawer-head">
+    <h2>Browse Filters</h2>
+    <button type="button" class="filter-close-button" data-close-filters aria-label="Close filters">Close</button>
+  </div>
+  <div class="filter-drawer-body">
+    <aside class="pane pane-nav">
+      <div class="pane-header">
+        <h2>Browse By Date</h2>
+        <div class="browse-tabs">
+          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='current', sort=sort, year=selected_years or None, month=selected_months or None, day=selected_days or None, per_page=per_page) }}" class="{% if not undated %}active{% endif %}">Dated</a>
+          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=selected_years or None, month=selected_months or None, day=selected_days or None, undated=1, per_page=per_page) }}" class="{% if undated %}active{% endif %}">Undated</a>
+        </div>
+      </div>
+
+      {% if not undated %}
+      <form method="get" action="{{ url_for('browse') }}" class="date-filter-form">
+        <input type="hidden" name="q" value="{{ q }}">
+        <input type="hidden" name="dataset" value="{{ dataset or '' }}">
+        <input type="hidden" name="scope" value="current">
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <input type="hidden" name="per_page" value="{{ per_page }}">
+
+        <div class="date-section date-section-years">
+          <h3>Years</h3>
+          <ul>
+            {% for y in years %}
+            <li>
+              <label class="date-option">
+                <input type="checkbox" name="year" value="{{ y['year'] }}" {% if y['year'] in selected_years %}checked{% endif %}>
+                <span class="date-value">{{ y["year"] }}</span>
+              </label>
+              <span>{{ y["count"] }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <div class="date-section date-section-months">
+          <h3>Months</h3>
+          {% if selected_years %}
+          <ul>
+            {% for m in months %}
+            <li>
+              <label class="date-option">
+                <input type="checkbox" name="month" value="{{ m['month'] }}" {% if m['month'] in selected_months %}checked{% endif %}>
+                <span class="date-value">{{ "%02d"|format(m["month"]) }}</span>
+              </label>
+              <span>{{ m["count"] }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="muted">Select at least one year to choose months.</p>
+          {% endif %}
+        </div>
+
+        <div class="date-section date-section-days">
+          <h3>Days</h3>
+          {% if selected_years and selected_months %}
+          <ul>
+            {% for d in days %}
+            <li>
+              <label class="date-option">
+                <input type="checkbox" name="day" value="{{ d['day'] }}" {% if d['day'] in selected_days %}checked{% endif %}>
+                <span class="date-value">{{ "%02d"|format(d["day"]) }}</span>
+              </label>
+              <span>{{ d["count"] }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="muted">Select year and month values to choose days.</p>
+          {% endif %}
+        </div>
+
+        <div class="date-section date-filter-actions">
+          <button type="submit">Apply Date Filters</button>
+          <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='all', sort=sort, per_page=per_page) }}">All dates</a>
+        </div>
+      </form>
+      {% else %}
+      <div class="date-section">
+        <h3>Undated archive</h3>
+        <p class="muted">Browsing documents without a valid date.</p>
+      </div>
+      {% endif %}
+    </aside>
+  </div>
+</aside>
+
 <section class="browser-layout">
-  <aside class="pane pane-nav">
-    <div class="pane-header">
-      <h2>Browse By Date</h2>
-      <div class="browse-tabs">
-        <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='current', sort=sort, year=selected_years or None, month=selected_months or None, day=selected_days or None, per_page=per_page) }}" class="{% if not undated %}active{% endif %}">Dated</a>
-        <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=selected_years or None, month=selected_months or None, day=selected_days or None, undated=1, per_page=per_page) }}" class="{% if undated %}active{% endif %}">Undated</a>
-      </div>
-    </div>
-
-    {% if not undated %}
-    <form method="get" action="{{ url_for('browse') }}" class="date-filter-form">
-      <input type="hidden" name="q" value="{{ q }}">
-      <input type="hidden" name="dataset" value="{{ dataset or '' }}">
-      <input type="hidden" name="scope" value="current">
-      <input type="hidden" name="sort" value="{{ sort }}">
-      <input type="hidden" name="per_page" value="{{ per_page }}">
-
-      <div class="date-section date-section-years">
-        <h3>Years</h3>
-        <ul>
-          {% for y in years %}
-          <li>
-            <label class="date-option">
-              <input type="checkbox" name="year" value="{{ y['year'] }}" {% if y['year'] in selected_years %}checked{% endif %}>
-              <span class="date-value">{{ y["year"] }}</span>
-            </label>
-            <span>{{ y["count"] }}</span>
-          </li>
-          {% endfor %}
-        </ul>
-      </div>
-
-      <div class="date-section date-section-months">
-        <h3>Months</h3>
-        {% if selected_years %}
-        <ul>
-          {% for m in months %}
-          <li>
-            <label class="date-option">
-              <input type="checkbox" name="month" value="{{ m['month'] }}" {% if m['month'] in selected_months %}checked{% endif %}>
-              <span class="date-value">{{ "%02d"|format(m["month"]) }}</span>
-            </label>
-            <span>{{ m["count"] }}</span>
-          </li>
-          {% endfor %}
-        </ul>
-        {% else %}
-        <p class="muted">Select at least one year to choose months.</p>
-        {% endif %}
-      </div>
-
-      <div class="date-section date-section-days">
-        <h3>Days</h3>
-        {% if selected_years and selected_months %}
-        <ul>
-          {% for d in days %}
-          <li>
-            <label class="date-option">
-              <input type="checkbox" name="day" value="{{ d['day'] }}" {% if d['day'] in selected_days %}checked{% endif %}>
-              <span class="date-value">{{ "%02d"|format(d["day"]) }}</span>
-            </label>
-            <span>{{ d["count"] }}</span>
-          </li>
-          {% endfor %}
-        </ul>
-        {% else %}
-        <p class="muted">Select year and month values to choose days.</p>
-        {% endif %}
-      </div>
-
-      <div class="date-section date-filter-actions">
-        <button type="submit">Apply Date Filters</button>
-        <a href="{{ url_for('browse', q=q or None, dataset=dataset, scope='all', sort=sort, per_page=per_page) }}">All dates</a>
-      </div>
-    </form>
-    {% else %}
-    <div class="date-section">
-      <h3>Undated archive</h3>
-      <p class="muted">Browsing documents without a valid date.</p>
-    </div>
-    {% endif %}
-  </aside>
-
   <section class="pane pane-list">
     <div class="pane-header">
       <h2>Document List</h2>
@@ -191,7 +213,7 @@
     {% if selected_doc %}
     <div class="doc-preview">
       <h3>{{ selected_doc["filename"] }}</h3>
-      <dl>
+      <dl class="preview-meta">
         <dt>ID</dt>
         <dd>{{ selected_doc["id"] }}</dd>
         <dt>Date</dt>
@@ -203,17 +225,17 @@
         <dt>Type</dt>
         <dd>{{ selected_doc["type"] or "Not available" }}</dd>
       </dl>
-      <p class="actions">
+      <p class="actions preview-actions">
         <a class="button-link" href="{{ selected_doc['url'] }}" target="_blank" rel="noopener noreferrer">Open Original Source</a>
         <a class="button-link secondary" href="{{ url_for('doc_detail', doc_id=selected_doc['id'], back=request.full_path) }}">Open Full View</a>
       </p>
       {% if selected_doc["content"] %}
-      <section>
+      <section class="preview-summary">
         <h4>Summary</h4>
         <p>{{ selected_doc["content"] }}</p>
       </section>
       {% endif %}
-      <section>
+      <section class="preview-message-wrap">
         <h4>Message</h4>
         <pre class="preview-message">{{ selected_doc["message"]|highlight_search(q) }}</pre>
       </section>
@@ -224,6 +246,65 @@
   </aside>
 </section>
 <script>
+  (function () {
+    const drawer = document.getElementById("filter-drawer");
+    const backdrop = document.getElementById("filter-backdrop");
+    const openButtons = Array.from(document.querySelectorAll("[data-open-filters]"));
+    const closeButtons = Array.from(document.querySelectorAll("[data-close-filters]"));
+    if (!drawer || !backdrop || !openButtons.length) {
+      return;
+    }
+
+    let closeTimer = 0;
+    const syncExpanded = function (isOpen) {
+      openButtons.forEach(function (button) {
+        button.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      });
+    };
+
+    const openDrawer = function () {
+      if (closeTimer) {
+        window.clearTimeout(closeTimer);
+      }
+      drawer.hidden = false;
+      backdrop.hidden = false;
+      requestAnimationFrame(function () {
+        drawer.classList.add("is-open");
+        backdrop.classList.add("is-open");
+      });
+      document.body.classList.add("filters-open");
+      syncExpanded(true);
+    };
+
+    const closeDrawer = function () {
+      drawer.classList.remove("is-open");
+      backdrop.classList.remove("is-open");
+      document.body.classList.remove("filters-open");
+      syncExpanded(false);
+
+      closeTimer = window.setTimeout(function () {
+        if (!drawer.classList.contains("is-open")) {
+          drawer.hidden = true;
+          backdrop.hidden = true;
+        }
+      }, 220);
+    };
+
+    openButtons.forEach(function (button) {
+      button.addEventListener("click", openDrawer);
+    });
+    closeButtons.forEach(function (button) {
+      button.addEventListener("click", closeDrawer);
+    });
+    backdrop.addEventListener("click", closeDrawer);
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && drawer.classList.contains("is-open")) {
+        closeDrawer();
+      }
+    });
+  })();
+
   (function () {
     const list = document.querySelector(".list-scroll");
     if (!list) {
@@ -342,6 +423,9 @@
 
     document.addEventListener("keydown", function (event) {
       if (event.defaultPrevented) {
+        return;
+      }
+      if (document.body.classList.contains("filters-open")) {
         return;
       }
       if (event.altKey || event.ctrlKey || event.metaKey) {
