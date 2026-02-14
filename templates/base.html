@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Document Browser{% endblock %}</title>
+  <title>{% block title %}Epstein Textfile Browser{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   <script>
     (function () {
@@ -274,8 +274,7 @@
 <body class="{% block body_class %}{% endblock %}">
   <header class="site-header">
     <div class="brand">
-      <h1><a href="{{ url_for('browse') }}">Public Document Browser</a></h1>
-      <p>Browse by date, then drill down with search.</p>
+      <h1><a href="{{ url_for('browse') }}">Epstein Textfile Browser</a></h1>
     </div>
   </header>
   <main class="page-shell {% block page_shell_class %}{% endblock %}">

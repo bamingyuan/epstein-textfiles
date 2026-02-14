@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Document Browser{% endblock %}
+{% block title %}Epstein Textfile Browser{% endblock %}
 {% block body_class %}browse-page{% endblock %}
 {% block page_shell_class %}page-shell-browser{% endblock %}
 {% block content %}
@@ -60,16 +60,6 @@
     </div>
   </form>
 
-  <div class="control-notes">
-    <p><strong>{{ total }}</strong> documents in current result set.</p>
-    <p>
-      {% if fts_enabled %}
-      Full-text index is available.
-      {% else %}
-      Full-text index is not initialized yet. Search works, but can be slower.
-      {% endif %}
-    </p>
-  </div>
 </section>
 
 <div class="filter-backdrop" id="filter-backdrop" hidden></div>

@@ -50,22 +50,17 @@ a {
 .brand {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 1rem 1.2rem;
+  padding: 0.55rem 1rem;
 }
 
 .brand h1 {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 1.02rem;
 }
 
 .brand h1 a {
   color: var(--ink);
   text-decoration: none;
-}
-
-.brand p {
-  margin: 0.2rem 0 0;
-  color: var(--ink-soft);
 }
 
 .page-shell {
@@ -86,7 +81,7 @@ a {
 
 .control-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.36fr);
+  grid-template-columns: 1fr;
   gap: 1rem;
   align-items: stretch;
   margin-bottom: 1rem;
@@ -163,19 +158,6 @@ a {
   background: #fff;
   color: var(--accent-strong);
   border-color: var(--line-strong);
-}
-
-.control-notes {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 0.8rem 1rem;
-  box-shadow: var(--shadow);
-  min-width: 0;
-}
-
-.control-notes p {
-  margin: 0.35rem 0;
 }
 
 .filter-backdrop {
@@ -896,22 +878,6 @@ strong.message-structure {
 
 body.cookie-modal-open {
   overflow: hidden;
-}
-
-@media (max-width: 1320px) {
-  .control-panel {
-    grid-template-columns: 1fr;
-  }
-
-  .control-notes {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.8rem 1.2rem;
-  }
-
-  .control-notes p {
-    margin: 0;
-  }
 }
 
 @media (max-width: 1100px) {
