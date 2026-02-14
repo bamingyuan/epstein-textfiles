@@ -312,6 +312,8 @@
 
     const consentManager = window.cookieConsentManager;
     const canUsePreferenceStorage = !consentManager || consentManager.canUseCategory("preferences");
+    const keyboardNavQueryParam = "_knav";
+    const listScrollQueryParam = "_ls";
     const readSession = function (key) {
       if (!canUsePreferenceStorage) {
         return null;
@@ -332,34 +334,34 @@
         // Ignore storage failures (blocked storage / quota limits).
       }
     };
-    const removeSession = function (key) {
-      if (!canUsePreferenceStorage) {
-        return;
-      }
-      try {
-        sessionStorage.removeItem(key);
-      } catch (error) {
-        // Ignore storage failures (blocked storage / quota limits).
-      }
-    };
-
     const keyUrl = new URL(window.location.href);
+    let shouldReplaceUrl = false;
+    const hasKeyboardNavQueryFlag = keyUrl.searchParams.get(keyboardNavQueryParam) === "1";
+    if (hasKeyboardNavQueryFlag) {
+      keyUrl.searchParams.delete(keyboardNavQueryParam);
+      shouldReplaceUrl = true;
+    }
+    const scrollFromQueryRaw = keyUrl.searchParams.get(listScrollQueryParam);
+    const scrollFromQuery = scrollFromQueryRaw === null ? NaN : Number(scrollFromQueryRaw);
+    const hasScrollFromQuery = Number.isFinite(scrollFromQuery);
+    if (keyUrl.searchParams.has(listScrollQueryParam)) {
+      keyUrl.searchParams.delete(listScrollQueryParam);
+      shouldReplaceUrl = true;
+    }
+    if (shouldReplaceUrl) {
+      window.history.replaceState(null, "", keyUrl.toString());
+    }
     keyUrl.searchParams.delete("doc");
     const storageKey = "browse:list-scroll:" + keyUrl.pathname + "?" + keyUrl.searchParams.toString();
-    const keyboardNavFlagKey = storageKey + ":keyboard-nav";
-    const shouldFocusActiveRow = readSession(keyboardNavFlagKey) === "1";
-    if (shouldFocusActiveRow) {
-      removeSession(keyboardNavFlagKey);
-    }
+    const shouldFocusActiveRow = hasKeyboardNavQueryFlag;
 
     const savedScrollTop = readSession(storageKey);
-    if (savedScrollTop !== null) {
-      const parsed = Number(savedScrollTop);
-      if (Number.isFinite(parsed)) {
-        requestAnimationFrame(function () {
-          list.scrollTop = parsed;
-        });
-      }
+    const sessionScrollTop = savedScrollTop !== null ? Number(savedScrollTop) : NaN;
+    const initialScrollTop = hasScrollFromQuery ? scrollFromQuery : sessionScrollTop;
+    if (Number.isFinite(initialScrollTop)) {
+      requestAnimationFrame(function () {
+        list.scrollTop = initialScrollTop;
+      });
     }
 
     const saveScroll = function () {
@@ -380,9 +382,6 @@
     if (canUsePreferenceStorage) {
       list.addEventListener("scroll", saveScroll, { passive: true });
       window.addEventListener("beforeunload", saveScroll);
-      document.querySelectorAll(".doc-row-link").forEach(function (link) {
-        link.addEventListener("click", saveScroll);
-      });
     }
 
     const links = Array.from(document.querySelectorAll(".doc-row-link"));
@@ -457,9 +456,36 @@
       }
 
       event.preventDefault();
-      writeSession(keyboardNavFlagKey, "1");
+      const nextLink = links[nextIndex];
+      const nextRow = nextLink ? nextLink.closest(".doc-row") : null;
+      if (nextRow) {
+        nextRow.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }
       saveScroll();
-      window.location.assign(links[nextIndex].href);
+      const nextUrl = new URL(nextLink.href, window.location.href);
+      nextUrl.searchParams.set(keyboardNavQueryParam, "1");
+      nextUrl.searchParams.set(listScrollQueryParam, String(list.scrollTop));
+      window.location.assign(nextUrl.toString());
+    });
+
+    links.forEach(function (link) {
+      link.addEventListener("click", function (event) {
+        if (event.defaultPrevented) {
+          return;
+        }
+        if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+          return;
+        }
+        if (link.target && link.target.toLowerCase() === "_blank") {
+          return;
+        }
+
+        event.preventDefault();
+        saveScroll();
+        const nextUrl = new URL(link.href, window.location.href);
+        nextUrl.searchParams.set(listScrollQueryParam, String(list.scrollTop));
+        window.location.assign(nextUrl.toString());
+      });
     });
   })();
 </script>
