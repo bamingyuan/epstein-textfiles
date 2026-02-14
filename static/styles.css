@@ -155,9 +155,60 @@ a {
 }
 
 .search-form .filter-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  background: linear-gradient(160deg, #0f7f7f, #0b5a5a);
+  color: #fff;
+  border-color: #084141;
+  font-weight: 600;
+  box-shadow: 0 8px 18px rgba(11, 79, 79, 0.25);
+}
+
+.search-form .filter-toggle-button:hover {
+  background: linear-gradient(160deg, #109090, #0c6666);
+}
+
+.search-form .filter-toggle-button:focus-visible {
+  outline: 2px solid #0c6666;
+  outline-offset: 2px;
+}
+
+.search-form .filter-toggle-button .filter-toggle-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 0.84rem;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.search-form .filter-toggle-button[aria-expanded="true"] .filter-toggle-arrow {
+  transform: rotate(180deg);
+}
+
+.search-form .filter-toggle-button .filter-toggle-label {
+  white-space: nowrap;
+}
+
+.search-form .filter-toggle-button .filter-toggle-count {
+  min-width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.76rem;
+  line-height: 1;
+  font-family: "IBM Plex Mono", "Cascadia Mono", monospace;
   background: #fff;
   color: var(--accent-strong);
-  border-color: var(--line-strong);
+  border: 1px solid rgba(255, 255, 255, 0.35);
 }
 
 .filter-backdrop {

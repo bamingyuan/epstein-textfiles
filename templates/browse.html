@@ -147,8 +147,13 @@
         <input type="hidden" name="per_page" value="{{ per_page }}">
 
         <div class="form-actions">
+          {% set active_filter_count = (selected_years|length) + (selected_months|length) + (selected_days|length) + (1 if undated else 0) %}
           <button type="button" class="filter-toggle-button" data-open-filters aria-controls="filter-drawer" aria-expanded="false">
-            Browse Filters
+            <span class="filter-toggle-arrow" aria-hidden="true">&larr;</span>
+            <span class="filter-toggle-label">Browse Filters</span>
+            {% if active_filter_count > 0 %}
+            <span class="filter-toggle-count" aria-label="{{ active_filter_count }} active filters">{{ active_filter_count }}</span>
+            {% endif %}
           </button>
           <button type="submit">Apply</button>
         </div>
