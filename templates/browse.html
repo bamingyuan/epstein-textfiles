@@ -3,65 +3,6 @@
 {% block body_class %}browse-page{% endblock %}
 {% block page_shell_class %}page-shell-browser{% endblock %}
 {% block content %}
-<section class="control-panel">
-  <form method="get" action="{{ url_for('browse') }}" class="search-form">
-    <div class="form-field form-field-search">
-      <label for="q">Search</label>
-      <input id="q" type="text" name="q" value="{{ q }}" placeholder="Try: meeting minutes OR exact phrase in quotes">
-    </div>
-
-    <div class="form-field">
-      <label for="dataset">Dataset</label>
-      <select id="dataset" name="dataset">
-        <option value="">All datasets</option>
-        {% for ds in datasets %}
-        <option value="{{ ds['dataset'] }}" {% if dataset == ds['dataset'] %}selected{% endif %}>
-          {{ ds["dataset"] }} ({{ ds["count"] }})
-        </option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <div class="form-field">
-      <label for="scope">Search Scope</label>
-      <select id="scope" name="scope">
-        <option value="current" {% if scope == "current" %}selected{% endif %}>Within current browse period</option>
-        <option value="all" {% if scope == "all" %}selected{% endif %}>All documents</option>
-      </select>
-    </div>
-
-    <div class="form-field">
-      <label for="sort">Sort</label>
-      <select id="sort" name="sort">
-        <option value="date_asc" {% if sort == "date_asc" %}selected{% endif %}>Date/time oldest first</option>
-        <option value="date_desc" {% if sort == "date_desc" %}selected{% endif %}>Date/time newest first</option>
-      </select>
-    </div>
-
-    {% for selected_year in selected_years %}
-    <input type="hidden" name="year" value="{{ selected_year }}">
-    {% endfor %}
-    {% for selected_month in selected_months %}
-    <input type="hidden" name="month" value="{{ selected_month }}">
-    {% endfor %}
-    {% for selected_day in selected_days %}
-    <input type="hidden" name="day" value="{{ selected_day }}">
-    {% endfor %}
-    {% if undated %}
-    <input type="hidden" name="undated" value="1">
-    {% endif %}
-    <input type="hidden" name="per_page" value="{{ per_page }}">
-
-    <div class="form-actions">
-      <button type="button" class="filter-toggle-button" data-open-filters aria-controls="filter-drawer" aria-expanded="false">
-        Browse Filters
-      </button>
-      <button type="submit">Apply</button>
-    </div>
-  </form>
-
-</section>
-
 <div class="filter-backdrop" id="filter-backdrop" hidden></div>
 <aside class="filter-drawer" id="filter-drawer" hidden>
   <div class="filter-drawer-head">
@@ -156,6 +97,64 @@
 
 <section class="browser-layout">
   <section class="pane pane-list">
+    <section class="control-panel control-panel-list">
+      <form method="get" action="{{ url_for('browse') }}" class="search-form">
+        <div class="form-field form-field-search">
+          <label for="q">Search</label>
+          <input id="q" type="text" name="q" value="{{ q }}" placeholder="Try: meeting minutes OR exact phrase in quotes">
+        </div>
+
+        <div class="form-field">
+          <label for="dataset">Dataset</label>
+          <select id="dataset" name="dataset">
+            <option value="">All datasets</option>
+            {% for ds in datasets %}
+            <option value="{{ ds['dataset'] }}" {% if dataset == ds['dataset'] %}selected{% endif %}>
+              {{ ds["dataset"] }} ({{ ds["count"] }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-field">
+          <label for="scope">Search Scope</label>
+          <select id="scope" name="scope">
+            <option value="current" {% if scope == "current" %}selected{% endif %}>Within current browse period</option>
+            <option value="all" {% if scope == "all" %}selected{% endif %}>All documents</option>
+          </select>
+        </div>
+
+        <div class="form-field">
+          <label for="sort">Sort</label>
+          <select id="sort" name="sort">
+            <option value="date_asc" {% if sort == "date_asc" %}selected{% endif %}>Date/time oldest first</option>
+            <option value="date_desc" {% if sort == "date_desc" %}selected{% endif %}>Date/time newest first</option>
+          </select>
+        </div>
+
+        {% for selected_year in selected_years %}
+        <input type="hidden" name="year" value="{{ selected_year }}">
+        {% endfor %}
+        {% for selected_month in selected_months %}
+        <input type="hidden" name="month" value="{{ selected_month }}">
+        {% endfor %}
+        {% for selected_day in selected_days %}
+        <input type="hidden" name="day" value="{{ selected_day }}">
+        {% endfor %}
+        {% if undated %}
+        <input type="hidden" name="undated" value="1">
+        {% endif %}
+        <input type="hidden" name="per_page" value="{{ per_page }}">
+
+        <div class="form-actions">
+          <button type="button" class="filter-toggle-button" data-open-filters aria-controls="filter-drawer" aria-expanded="false">
+            Browse Filters
+          </button>
+          <button type="submit">Apply</button>
+        </div>
+      </form>
+    </section>
+
     <div class="pane-header">
       <h2>Document List</h2>
       <p>Page {{ page }} of {{ total_pages }}</p>

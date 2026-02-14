@@ -73,7 +73,7 @@ a {
 .page-shell-browser {
   height: 100%;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: 1fr;
   gap: 1rem;
   min-height: 0;
   overflow: hidden;
@@ -82,9 +82,9 @@ a {
 .control-panel {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1rem;
+  gap: 0;
   align-items: stretch;
-  margin-bottom: 1rem;
+  margin: 0;
 }
 
 .search-form {
@@ -267,6 +267,34 @@ body.filters-open {
 
 .page-shell-browser .control-panel {
   margin-bottom: 0;
+}
+
+.control-panel-list {
+  border-bottom: 1px solid var(--line);
+  padding: 0.6rem 0.7rem;
+  background: linear-gradient(180deg, #fffef8, #f7f3e8);
+}
+
+.control-panel-list .search-form {
+  box-shadow: none;
+  border-radius: 10px;
+  padding: 0.55rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.control-panel-list .search-form .form-field {
+  flex: initial;
+}
+
+.control-panel-list .search-form .form-field-search,
+.control-panel-list .search-form .form-actions {
+  grid-column: 1 / -1;
+}
+
+.control-panel-list .search-form .form-actions {
+  min-width: 0;
 }
 
 .page-shell-browser .browser-layout {
@@ -923,6 +951,10 @@ body.cookie-modal-open {
   .search-form .form-actions {
     flex: 1 1 100%;
     min-width: 100%;
+  }
+
+  .control-panel-list .search-form {
+    grid-template-columns: 1fr;
   }
 
   .browser-layout {
