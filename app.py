@@ -216,8 +216,10 @@ def extract_positive_search_terms(raw: str) -> list[str]:
     return positive
 
 
+STRUCTURE_QUOTE_PREFIX_RE = re.compile(r"^\s*(?:>\s*)*")
+
 STRUCTURE_LINE_RE = re.compile(
-    r"^\s*(?:"
+    r"^(?:"
     r"/{3,}\s*PAGE\b.*"
     r"|(?:From|To|Subject|Cc|Date)\b\s*:?\s*.*"
     r"|Sent\b(?!\s+from\s+my\b)\s*:?\s*.*"
@@ -225,6 +227,43 @@ STRUCTURE_LINE_RE = re.compile(
     r")\s*$",
     re.IGNORECASE,
 )
+
+ON_WROTE_LINE_RE = re.compile(r"^On\b.*\bwrote\b\s*:?$", re.IGNORECASE)
+ON_LINE_START_RE = re.compile(r"^On\b", re.IGNORECASE)
+
+
+def normalize_structure_line(line: str) -> str:
+    return STRUCTURE_QUOTE_PREFIX_RE.sub("", line).strip()
+
+
+def structure_line_indexes(text: str) -> set[int]:
+    lines = text.splitlines()
+    normalized_lines = [normalize_structure_line(line) for line in lines]
+    structure_indexes: set[int] = set()
+
+    for index, normalized in enumerate(normalized_lines):
+        if not normalized:
+            continue
+
+        if STRUCTURE_LINE_RE.match(normalized):
+            structure_indexes.add(index)
+            continue
+
+        if not ON_LINE_START_RE.match(normalized):
+            continue
+
+        combined = normalized
+        max_join = min(index + 3, len(normalized_lines) - 1)
+        for next_index in range(index + 1, max_join + 1):
+            next_line = normalized_lines[next_index]
+            if not next_line:
+                break
+            combined = f"{combined} {next_line}"
+            if ON_WROTE_LINE_RE.match(combined):
+                structure_indexes.update(range(index, next_index + 1))
+                break
+
+    return structure_indexes
 
 
 def search_highlight_pattern(raw_query: str | None) -> re.Pattern[str] | None:
@@ -265,14 +304,15 @@ def highlight_search_filter(text: str | None, raw_query: str | None = None) -> M
         return Markup("")
 
     pattern = search_highlight_pattern(raw_query)
+    structure_indexes = structure_line_indexes(text)
     rendered: list[Markup] = []
 
-    for line in text.splitlines(keepends=True):
+    for line_index, line in enumerate(text.splitlines(keepends=True)):
         line_text = line.rstrip("\r\n")
         line_break = line[len(line_text) :]
 
         line_markup = render_highlighted_text(line_text, pattern)
-        if STRUCTURE_LINE_RE.match(line_text):
+        if line_index in structure_indexes:
             line_markup = Markup('<strong class="message-structure">') + line_markup + Markup("</strong>")
 
         rendered.append(line_markup)
