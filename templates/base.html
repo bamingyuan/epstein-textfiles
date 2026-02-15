@@ -78,7 +78,11 @@
         } catch (error) {
           // localStorage may be unavailable (private mode / strict browser settings).
         }
-        writeCookie(consent);
+        try {
+          writeCookie(consent);
+        } catch (error) {
+          // Cookie writes can fail in strict browser/privacy configurations.
+        }
       };
 
       let currentConsent = readStoredConsent();
@@ -118,16 +122,32 @@
         },
         acceptAll: function () {
           const nextConsent = withDecision({ preferences: true, analytics: true, marketing: true });
-          persistConsent(nextConsent);
-          applyConsent(nextConsent);
+          try {
+            persistConsent(nextConsent);
+          } catch (error) {
+            // Continue with in-memory consent so UI remains responsive.
+          }
+          try {
+            applyConsent(nextConsent);
+          } catch (error) {
+            // Keep UI flow resilient even if event dispatch fails.
+          }
           if (typeof window.__hideCookieUI === "function") {
             window.__hideCookieUI();
           }
         },
         rejectOptional: function () {
           const nextConsent = withDecision({ preferences: false, analytics: false, marketing: false });
-          persistConsent(nextConsent);
-          applyConsent(nextConsent);
+          try {
+            persistConsent(nextConsent);
+          } catch (error) {
+            // Continue with in-memory consent so UI remains responsive.
+          }
+          try {
+            applyConsent(nextConsent);
+          } catch (error) {
+            // Keep UI flow resilient even if event dispatch fails.
+          }
           if (typeof window.__hideCookieUI === "function") {
             window.__hideCookieUI();
           }
@@ -138,8 +158,16 @@
             analytics: analytics,
             marketing: marketing
           });
-          persistConsent(nextConsent);
-          applyConsent(nextConsent);
+          try {
+            persistConsent(nextConsent);
+          } catch (error) {
+            // Continue with in-memory consent so UI remains responsive.
+          }
+          try {
+            applyConsent(nextConsent);
+          } catch (error) {
+            // Keep UI flow resilient even if event dispatch fails.
+          }
           if (typeof window.__hideCookieUI === "function") {
             window.__hideCookieUI();
           }
@@ -222,15 +250,23 @@
           settingsTrigger.addEventListener("click", openModal);
         }
         if (bannerCustomizeButton) {
-          bannerCustomizeButton.addEventListener("click", openModal);
+          bannerCustomizeButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            openModal();
+          });
         }
         if (bannerAcceptButton) {
-          bannerAcceptButton.addEventListener("click", function () {
+          bannerAcceptButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
             window.cookieConsentManager.acceptAll();
           });
         }
         if (bannerRejectButton) {
-          bannerRejectButton.addEventListener("click", function () {
+          bannerRejectButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
             window.cookieConsentManager.rejectOptional();
           });
         }
