@@ -882,6 +882,17 @@ def browse() -> str:
             [selected_doc_id],
         ).fetchone()
 
+    previous_doc_id = None
+    next_doc_id = None
+    if selected_doc_id is not None and rows:
+        row_ids = [row["id"] for row in rows]
+        if selected_doc_id in row_ids:
+            selected_index = row_ids.index(selected_doc_id)
+            if selected_index > 0:
+                previous_doc_id = row_ids[selected_index - 1]
+            if selected_index < len(row_ids) - 1:
+                next_doc_id = row_ids[selected_index + 1]
+
     years = cached_year_counts(DB_PATH, cache_token, dataset, q, page_data["fts_enabled"])
     months = cached_month_counts(
         DB_PATH, cache_token, selected_years, dataset, q, page_data["fts_enabled"]
@@ -913,6 +924,8 @@ def browse() -> str:
         undated=undated,
         datasets=datasets,
         fts_enabled=page_data["fts_enabled"],
+        previous_doc_id=previous_doc_id,
+        next_doc_id=next_doc_id,
     )
 
 

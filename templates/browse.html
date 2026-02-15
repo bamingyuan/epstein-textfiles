@@ -248,6 +248,29 @@
       <section class="preview-message-wrap">
         <h4>Message</h4>
         <pre class="preview-message">{{ selected_doc["message"]|highlight_search(q) }}</pre>
+        <nav class="preview-message-nav" aria-label="Message navigation">
+          {% if previous_doc_id %}
+          <a
+            class="message-nav-button"
+            href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=selected_years or None, month=selected_months or None, day=selected_days or None, undated=1 if undated else None, per_page=per_page, page=page, doc=previous_doc_id) }}"
+            aria-label="Previous message"
+            title="Previous message"
+          >&larr;</a>
+          {% else %}
+          <span class="message-nav-button is-disabled" aria-hidden="true">&larr;</span>
+          {% endif %}
+
+          {% if next_doc_id %}
+          <a
+            class="message-nav-button"
+            href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=selected_years or None, month=selected_months or None, day=selected_days or None, undated=1 if undated else None, per_page=per_page, page=page, doc=next_doc_id) }}"
+            aria-label="Next message"
+            title="Next message"
+          >&rarr;</a>
+          {% else %}
+          <span class="message-nav-button is-disabled" aria-hidden="true">&rarr;</span>
+          {% endif %}
+        </nav>
       </section>
     </div>
     {% else %}
