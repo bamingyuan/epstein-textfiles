@@ -6,6 +6,7 @@ import shlex
 import sqlite3
 from datetime import datetime
 from functools import lru_cache
+from urllib.parse import urlsplit, urlunsplit
 
 from flask import Flask, abort, g, jsonify, render_template, request, url_for
 from markupsafe import Markup, escape
@@ -51,8 +52,10 @@ PER_PAGE_MAX = 100
 
 ALLOWED_SCOPE = {"current", "all"}
 ALLOWED_SORT = {"date_desc", "date_asc"}
+ALLOWED_EXTERNAL_URL_SCHEMES = {"http", "https"}
 MAX_BROWSE_YEAR = 2019
 DEFAULT_SELECTED_YEARS = (2016, 2017, 2018, 2019)
+FTS_TOKEN_RE = re.compile(r"[A-Za-z0-9_]+")
 
 SEARCH_INDEX_SQL = [
     'CREATE INDEX IF NOT EXISTS idx_messages_date ON messages("date")',
@@ -115,6 +118,21 @@ FTS_SQL = [
 app = Flask(__name__)
 
 
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self'; "
+        "img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
+        "form-action 'self'",
+    )
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    return response
+
+
 def get_db() -> sqlite3.Connection:
     if "db" not in g:
         conn = sqlite3.connect(DB_PATH)
@@ -167,6 +185,35 @@ def clean_string(value: str | None) -> str:
     return (value or "").strip()
 
 
+def sanitize_external_url(value: str | None) -> str:
+    text = clean_string(value)
+    if not text:
+        return ""
+
+    parsed = urlsplit(text)
+    if parsed.scheme.lower() not in ALLOWED_EXTERNAL_URL_SCHEMES:
+        return ""
+    if not parsed.netloc:
+        return ""
+
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, parsed.query, parsed.fragment))
+
+
+def sanitize_back_url(value: str | None) -> str:
+    fallback = url_for("browse")
+    text = clean_string(value)
+    if not text:
+        return fallback
+
+    parsed = urlsplit(text)
+    if parsed.scheme or parsed.netloc:
+        return fallback
+    if not parsed.path.startswith("/") or parsed.path.startswith("//"):
+        return fallback
+
+    return urlunsplit(("", "", parsed.path, parsed.query, ""))
+
+
 def extract_date_portion(value: str | None) -> str | None:
     text = clean_string(value)
     if not text:
@@ -195,6 +242,11 @@ def display_date_filter(value: str | None) -> str:
 @app.template_filter("display_time")
 def display_time_filter(value: str | None) -> str:
     return extract_time_portion(value) or ""
+
+
+@app.template_filter("safe_external_url")
+def safe_external_url_filter(value: str | None) -> str:
+    return sanitize_external_url(value)
 
 
 def parse_search_terms(raw: str) -> list[str]:
@@ -329,7 +381,7 @@ def highlight_search_filter(text: str | None, raw_query: str | None = None) -> M
 
         rendered.append(line_markup)
         if line_break:
-            rendered.append(Markup(line_break))
+            rendered.append(escape(line_break))
 
     if not rendered:
         return render_highlighted_text(text, pattern)
@@ -346,11 +398,11 @@ def build_fts_query(raw: str) -> str:
     for term in terms:
         target = negative if term.startswith("-") and len(term) > 1 else positive
         normalized = term[1:] if target is negative else term
-        normalized = normalized.replace('"', '""')
-        if " " in normalized:
-            target.append(f'"{normalized}"')
-        else:
-            target.append(f"{normalized}*")
+        tokens = FTS_TOKEN_RE.findall(normalized)
+        if not tokens:
+            continue
+        phrase = " ".join(tokens).replace('"', '""')
+        target.append(f'"{phrase}"')
 
     if not positive:
         return ""
@@ -559,6 +611,13 @@ def apply_search_filters(
     return from_sql
 
 
+def is_fts_query_error(error: sqlite3.OperationalError) -> bool:
+    message = str(error).lower()
+    return "fts5" in message and (
+        "syntax error" in message or "malformed match expression" in message
+    )
+
+
 def sort_clause(sort: str, include_time: bool) -> str:
     if include_time:
         # Keep rows without a time value at the end in both sort directions.
@@ -619,7 +678,7 @@ def cached_doc_record(
 def serialize_preview_doc(doc: dict[str, object], q: str, back: str) -> dict[str, object]:
     message = str(doc.get("message") or "")
     summary = str(doc.get("content") or "")
-    source_url = clean_string(str(doc.get("url") or ""))
+    source_url = sanitize_external_url(str(doc.get("url") or ""))
 
     return {
         "id": doc["id"],
@@ -818,15 +877,26 @@ def cached_browse_page(
 ) -> dict[str, object]:
     conn = open_db_connection(db_path)
     try:
-        where, params = build_browse_filters(dataset, scope, years, months, days, undated)
-        from_sql = "messages m"
         fts_enabled = cached_has_fts(db_path, cache_token)
-
-        from_sql = apply_search_filters(from_sql, where, params, q, fts_enabled)
+        where, params = build_browse_filters(dataset, scope, years, months, days, undated)
+        from_sql = apply_search_filters("messages m", where, params, q, fts_enabled)
 
         where_sql = " AND ".join(where)
         count_sql = f"SELECT COUNT(*) AS count FROM {from_sql} WHERE {where_sql}"
-        total = conn.execute(count_sql, params).fetchone()["count"]
+
+        try:
+            total = conn.execute(count_sql, params).fetchone()["count"]
+        except sqlite3.OperationalError as error:
+            if not (fts_enabled and is_fts_query_error(error)):
+                raise
+
+            fts_enabled = False
+            where, params = build_browse_filters(dataset, scope, years, months, days, undated)
+            from_sql = apply_search_filters("messages m", where, params, q, fts_enabled)
+            where_sql = " AND ".join(where)
+            count_sql = f"SELECT COUNT(*) AS count FROM {from_sql} WHERE {where_sql}"
+            total = conn.execute(count_sql, params).fetchone()["count"]
+
         total_pages = max(1, (total + per_page - 1) // per_page)
         current_page = min(page, total_pages)
         offset = (current_page - 1) * per_page
@@ -982,7 +1052,7 @@ def doc_detail(doc_id: int) -> str:
     if doc is None:
         abort(404)
 
-    back = clean_string(request.args.get("back")) or url_for("browse")
+    back = sanitize_back_url(request.args.get("back"))
     return render_template("doc.html", doc=doc, back=back)
 
 
@@ -995,7 +1065,7 @@ def doc_preview_api(doc_id: int):
         abort(404)
 
     q = clean_string(request.args.get("q"))
-    back = clean_string(request.args.get("back")) or url_for("browse")
+    back = sanitize_back_url(request.args.get("back"))
     return jsonify(serialize_preview_doc(doc, q, back))
 
 
@@ -1031,4 +1101,4 @@ def init_search_command() -> None:
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)

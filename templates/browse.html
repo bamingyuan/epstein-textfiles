@@ -236,7 +236,18 @@
         <dd id="preview-type">{{ selected_doc["type"] or "Not available" }}</dd>
       </dl>
       <p class="actions preview-actions">
-        <a class="button-link" id="preview-source-link" href="{{ selected_doc['url'] }}" target="_blank" rel="noopener noreferrer">Open Original Source</a>
+        {% set preview_source_url = selected_doc["url"]|safe_external_url %}
+        <a
+          class="button-link"
+          id="preview-source-link"
+          {% if preview_source_url %}
+          href="{{ preview_source_url }}"
+          target="_blank"
+          rel="noopener noreferrer"
+          {% else %}
+          aria-disabled="true"
+          {% endif %}
+        >Open Original Source</a>
         <a class="button-link secondary" id="preview-full-link" href="{{ url_for('doc_detail', doc_id=selected_doc['id'], back=request.full_path) }}">Open Full View</a>
       </p>
       <section class="preview-summary" id="preview-summary"{% if not selected_doc["content"] %} hidden{% endif %}>
@@ -583,7 +594,7 @@
       const backUrl = new URL(window.location.href);
       backUrl.searchParams.delete(keyboardNavQueryParam);
       backUrl.searchParams.delete(listScrollQueryParam);
-      return backUrl.toString();
+      return backUrl.pathname + backUrl.search;
     };
 
     const apiUrlForDoc = function (docId) {
@@ -662,9 +673,13 @@
 
       if (payload.has_source_url && payload.source_url) {
         previewSourceLink.href = payload.source_url;
+        previewSourceLink.target = "_blank";
+        previewSourceLink.rel = "noopener noreferrer";
         previewSourceLink.removeAttribute("aria-disabled");
       } else {
         previewSourceLink.removeAttribute("href");
+        previewSourceLink.removeAttribute("target");
+        previewSourceLink.removeAttribute("rel");
         previewSourceLink.setAttribute("aria-disabled", "true");
       }
 

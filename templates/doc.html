@@ -21,7 +21,17 @@
     <dd>{{ doc["type"] or "Not available" }}</dd>
   </dl>
   <p>
-    <a class="button-link" href="{{ doc['url'] }}" target="_blank" rel="noopener noreferrer">Open Original Source</a>
+    {% set doc_source_url = doc["url"]|safe_external_url %}
+    <a
+      class="button-link"
+      {% if doc_source_url %}
+      href="{{ doc_source_url }}"
+      target="_blank"
+      rel="noopener noreferrer"
+      {% else %}
+      aria-disabled="true"
+      {% endif %}
+    >Open Original Source</a>
   </p>
   {% if doc["content"] %}
   <section>
