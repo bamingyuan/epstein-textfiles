@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime
 from functools import lru_cache
 
-from flask import Flask, abort, g, render_template, request, url_for
+from flask import Flask, abort, g, jsonify, render_template, request, url_for
 from markupsafe import Markup, escape
 
 
@@ -574,6 +574,69 @@ def sort_clause(sort: str, include_time: bool) -> str:
     return ascending
 
 
+def fetch_doc_record(
+    conn: sqlite3.Connection,
+    doc_id: int,
+    include_time: bool,
+) -> sqlite3.Row | None:
+    time_select_sql = '"time" AS "time"' if include_time else 'NULL AS "time"'
+    return conn.execute(
+        f"""
+        SELECT
+            "id",
+            "filename",
+            "dataset",
+            "date",
+            {time_select_sql},
+            "from",
+            "to",
+            "type",
+            "content",
+            "message",
+            "url"
+        FROM messages
+        WHERE "id" = ?
+        """,
+        [doc_id],
+    ).fetchone()
+
+
+@lru_cache(maxsize=512)
+def cached_doc_record(
+    db_path: str,
+    cache_token: tuple[int, int],
+    doc_id: int,
+    include_time: bool,
+) -> dict[str, object] | None:
+    conn = open_db_connection(db_path)
+    try:
+        row = fetch_doc_record(conn, doc_id, include_time)
+        return dict(row) if row is not None else None
+    finally:
+        conn.close()
+
+
+def serialize_preview_doc(doc: dict[str, object], q: str, back: str) -> dict[str, object]:
+    message = str(doc.get("message") or "")
+    summary = str(doc.get("content") or "")
+    source_url = clean_string(str(doc.get("url") or ""))
+
+    return {
+        "id": doc["id"],
+        "filename": str(doc.get("filename") or ""),
+        "dataset": str(doc.get("dataset") or ""),
+        "date": extract_date_portion(str(doc.get("date") or "")) or "Undated",
+        "time": extract_time_portion(str(doc.get("time") or "")) or "Not available",
+        "type": str(doc.get("type") or "Not available"),
+        "summary": summary,
+        "has_summary": bool(summary),
+        "source_url": source_url,
+        "has_source_url": bool(source_url),
+        "full_view_url": url_for("doc_detail", doc_id=doc["id"], back=back),
+        "message_html": str(highlight_search_filter(message, q)),
+    }
+
+
 def dataset_counts(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
         """
@@ -778,8 +841,8 @@ def cached_browse_page(
                 m."date",
                 {time_select_sql},
                 m."url",
-                m."content",
-                SUBSTR(m."message", 1, 700) AS preview
+                SUBSTR(m."content", 1, 700) AS content_preview,
+                SUBSTR(m."message", 1, 700) AS message_preview
             FROM {from_sql}
             WHERE {where_sql}
             ORDER BY {order_sql}
@@ -861,26 +924,7 @@ def browse() -> str:
 
     selected_doc = None
     if selected_doc_id is not None:
-        time_select_sql = '"time" AS "time"' if include_time else 'NULL AS "time"'
-        selected_doc = conn.execute(
-            f"""
-            SELECT
-                "id",
-                "filename",
-                "dataset",
-                "date",
-                {time_select_sql},
-                "from",
-                "to",
-                "type",
-                "content",
-                "message",
-                "url"
-            FROM messages
-            WHERE "id" = ?
-            """,
-            [selected_doc_id],
-        ).fetchone()
+        selected_doc = cached_doc_record(DB_PATH, cache_token, selected_doc_id, include_time)
 
     previous_doc_id = None
     next_doc_id = None
@@ -931,35 +975,28 @@ def browse() -> str:
 
 @app.route("/doc/<int:doc_id>")
 def doc_detail(doc_id: int) -> str:
-    conn = get_db()
     cache_token = db_cache_token(DB_PATH)
     include_time = has_time_column(DB_PATH, cache_token)
-    time_select_sql = '"time" AS "time"' if include_time else 'NULL AS "time"'
-    doc = conn.execute(
-        f"""
-        SELECT
-            "id",
-            "filename",
-            "dataset",
-            "date",
-            {time_select_sql},
-            "from",
-            "to",
-            "type",
-            "content",
-            "message",
-            "url"
-        FROM messages
-        WHERE "id" = ?
-        """,
-        [doc_id],
-    ).fetchone()
+    doc = cached_doc_record(DB_PATH, cache_token, doc_id, include_time)
 
     if doc is None:
         abort(404)
 
     back = clean_string(request.args.get("back")) or url_for("browse")
     return render_template("doc.html", doc=doc, back=back)
+
+
+@app.route("/api/doc/<int:doc_id>")
+def doc_preview_api(doc_id: int):
+    cache_token = db_cache_token(DB_PATH)
+    include_time = has_time_column(DB_PATH, cache_token)
+    doc = cached_doc_record(DB_PATH, cache_token, doc_id, include_time)
+    if doc is None:
+        abort(404)
+
+    q = clean_string(request.args.get("q"))
+    back = clean_string(request.args.get("back")) or url_for("browse")
+    return jsonify(serialize_preview_doc(doc, q, back))
 
 
 def initialize_search_objects(db_path: str) -> None:

@@ -183,7 +183,7 @@
     <div class="list-scroll">
       {% for row in rows %}
       <article class="doc-row {% if selected_doc_id == row['id'] %}active{% endif %}">
-        <a class="doc-row-link" href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=selected_years or None, month=selected_months or None, day=selected_days or None, undated=1 if undated else None, per_page=per_page, page=page, doc=row['id']) }}">
+        <a class="doc-row-link" data-doc-id="{{ row['id'] }}" href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=selected_years or None, month=selected_months or None, day=selected_days or None, undated=1 if undated else None, per_page=per_page, page=page, doc=row['id']) }}">
           <div class="doc-meta">
             {% set row_date = row["date"]|display_date %}
             {% set row_time = row["time"]|display_time %}
@@ -193,7 +193,7 @@
             <span class="doc-dataset">{{ row["dataset"] }}</span>
           </div>
           <h3>{{ row["filename"] }}</h3>
-          <p>{{ row["content"] or row["preview"] }}</p>
+          <p>{{ row["content_preview"] or row["message_preview"] }}</p>
         </a>
       </article>
       {% else %}
@@ -221,37 +221,36 @@
       <h2>Preview</h2>
     </div>
     {% if selected_doc %}
-    <div class="doc-preview">
-      <h3>{{ selected_doc["filename"] }}</h3>
+    <div class="doc-preview" id="doc-preview">
+      <h3 id="preview-filename">{{ selected_doc["filename"] }}</h3>
       <dl class="preview-meta">
         <dt>ID</dt>
-        <dd>{{ selected_doc["id"] }}</dd>
+        <dd id="preview-id">{{ selected_doc["id"] }}</dd>
         <dt>Date</dt>
-        <dd>{{ selected_doc["date"]|display_date or "Undated" }}</dd>
+        <dd id="preview-date">{{ selected_doc["date"]|display_date or "Undated" }}</dd>
         <dt>Time</dt>
-        <dd>{{ selected_doc["time"]|display_time or "Not available" }}</dd>
+        <dd id="preview-time">{{ selected_doc["time"]|display_time or "Not available" }}</dd>
         <dt>Dataset</dt>
-        <dd>{{ selected_doc["dataset"] }}</dd>
+        <dd id="preview-dataset">{{ selected_doc["dataset"] }}</dd>
         <dt>Type</dt>
-        <dd>{{ selected_doc["type"] or "Not available" }}</dd>
+        <dd id="preview-type">{{ selected_doc["type"] or "Not available" }}</dd>
       </dl>
       <p class="actions preview-actions">
-        <a class="button-link" href="{{ selected_doc['url'] }}" target="_blank" rel="noopener noreferrer">Open Original Source</a>
-        <a class="button-link secondary" href="{{ url_for('doc_detail', doc_id=selected_doc['id'], back=request.full_path) }}">Open Full View</a>
+        <a class="button-link" id="preview-source-link" href="{{ selected_doc['url'] }}" target="_blank" rel="noopener noreferrer">Open Original Source</a>
+        <a class="button-link secondary" id="preview-full-link" href="{{ url_for('doc_detail', doc_id=selected_doc['id'], back=request.full_path) }}">Open Full View</a>
       </p>
-      {% if selected_doc["content"] %}
-      <section class="preview-summary">
+      <section class="preview-summary" id="preview-summary"{% if not selected_doc["content"] %} hidden{% endif %}>
         <h4>Summary</h4>
-        <p>{{ selected_doc["content"] }}</p>
+        <p id="preview-summary-text">{{ selected_doc["content"] }}</p>
       </section>
-      {% endif %}
       <section class="preview-message-wrap">
         <h4>Message</h4>
-        <pre class="preview-message">{{ selected_doc["message"]|highlight_search(q) }}</pre>
-        <nav class="preview-message-nav" aria-label="Message navigation">
+        <pre class="preview-message" id="preview-message">{{ selected_doc["message"]|highlight_search(q) }}</pre>
+        <nav class="preview-message-nav" id="preview-message-nav" aria-label="Message navigation">
           {% if previous_doc_id %}
           <a
             class="message-nav-button"
+            data-doc-id="{{ previous_doc_id }}"
             href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=selected_years or None, month=selected_months or None, day=selected_days or None, undated=1 if undated else None, per_page=per_page, page=page, doc=previous_doc_id) }}"
             aria-label="Previous message"
             title="Previous message"
@@ -263,6 +262,7 @@
           {% if next_doc_id %}
           <a
             class="message-nav-button"
+            data-doc-id="{{ next_doc_id }}"
             href="{{ url_for('browse', q=q or None, dataset=dataset, scope=scope, sort=sort, year=selected_years or None, month=selected_months or None, day=selected_days or None, undated=1 if undated else None, per_page=per_page, page=page, doc=next_doc_id) }}"
             aria-label="Next message"
             title="Next message"
@@ -477,10 +477,55 @@
     }
 
     const links = Array.from(document.querySelectorAll(".doc-row-link"));
-    const messagePane = document.querySelector(".preview-message");
     if (!links.length) {
       return;
     }
+
+    const docApiTemplate = {{ url_for("doc_preview_api", doc_id=123456789)|tojson }};
+    const preview = document.getElementById("doc-preview");
+    const emptyPreview = document.querySelector(".pane-preview > .muted");
+    const previewFilename = document.getElementById("preview-filename");
+    const previewId = document.getElementById("preview-id");
+    const previewDate = document.getElementById("preview-date");
+    const previewTime = document.getElementById("preview-time");
+    const previewDataset = document.getElementById("preview-dataset");
+    const previewType = document.getElementById("preview-type");
+    const previewSourceLink = document.getElementById("preview-source-link");
+    const previewFullLink = document.getElementById("preview-full-link");
+    const previewSummary = document.getElementById("preview-summary");
+    const previewSummaryText = document.getElementById("preview-summary-text");
+    const previewMessage = document.getElementById("preview-message");
+    const previewNav = document.getElementById("preview-message-nav");
+
+    if (
+      !preview ||
+      !previewFilename ||
+      !previewId ||
+      !previewDate ||
+      !previewTime ||
+      !previewDataset ||
+      !previewType ||
+      !previewSourceLink ||
+      !previewFullLink ||
+      !previewSummary ||
+      !previewSummaryText ||
+      !previewMessage ||
+      !previewNav
+    ) {
+      return;
+    }
+
+    const rowByDocId = new Map();
+    links.forEach(function (link) {
+      const docId = Number(link.dataset.docId || "");
+      if (!Number.isFinite(docId)) {
+        return;
+      }
+      const row = link.closest(".doc-row");
+      if (row) {
+        rowByDocId.set(docId, row);
+      }
+    });
 
     const isTypingTarget = function (target) {
       if (!target) {
@@ -494,21 +539,198 @@
     };
 
     const canPageMessage = function (direction) {
-      if (!messagePane) {
-        return false;
-      }
       if (direction > 0) {
-        return messagePane.scrollTop + messagePane.clientHeight < messagePane.scrollHeight - 1;
+        return previewMessage.scrollTop + previewMessage.clientHeight < previewMessage.scrollHeight - 1;
       }
-      return messagePane.scrollTop > 0;
+      return previewMessage.scrollTop > 0;
     };
 
     const pageMessage = function (direction) {
-      if (!messagePane) {
+      const amount = Math.max(previewMessage.clientHeight - 24, 80);
+      previewMessage.scrollBy({ top: amount * direction, behavior: "auto" });
+    };
+
+    const extractDocIdFromUrl = function (urlString) {
+      try {
+        const parsed = new URL(urlString, window.location.href);
+        const raw = parsed.searchParams.get("doc");
+        const parsedId = raw === null ? NaN : Number(raw);
+        return Number.isFinite(parsedId) ? parsedId : NaN;
+      } catch (error) {
+        return NaN;
+      }
+    };
+
+    const findLinkIndexByDocId = function (docId) {
+      for (let index = 0; index < links.length; index += 1) {
+        const linkDocId = Number(links[index].dataset.docId || "");
+        if (linkDocId === docId) {
+          return index;
+        }
+      }
+      return -1;
+    };
+
+    const buildBrowseUrl = function (docId) {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.delete(keyboardNavQueryParam);
+      nextUrl.searchParams.delete(listScrollQueryParam);
+      nextUrl.searchParams.set("doc", String(docId));
+      return nextUrl;
+    };
+
+    const buildBackUrl = function () {
+      const backUrl = new URL(window.location.href);
+      backUrl.searchParams.delete(keyboardNavQueryParam);
+      backUrl.searchParams.delete(listScrollQueryParam);
+      return backUrl.toString();
+    };
+
+    const apiUrlForDoc = function (docId) {
+      return docApiTemplate.replace("123456789", String(docId));
+    };
+
+    const setActiveDoc = function (docId) {
+      const activeRow = document.querySelector(".doc-row.active");
+      if (activeRow) {
+        activeRow.classList.remove("active");
+      }
+      const nextActive = rowByDocId.get(docId);
+      if (nextActive) {
+        nextActive.classList.add("active");
+      }
+    };
+
+    const navTargetsForDoc = function (docId) {
+      const activeIndex = findLinkIndexByDocId(docId);
+      if (activeIndex < 0) {
+        return { previous: null, next: null };
+      }
+
+      const previousLink = activeIndex > 0 ? links[activeIndex - 1] : null;
+      const nextLink = activeIndex < links.length - 1 ? links[activeIndex + 1] : null;
+      const previousDocId = previousLink ? Number(previousLink.dataset.docId || "") : NaN;
+      const nextDocId = nextLink ? Number(nextLink.dataset.docId || "") : NaN;
+      return {
+        previous: Number.isFinite(previousDocId) ? previousDocId : null,
+        next: Number.isFinite(nextDocId) ? nextDocId : null,
+      };
+    };
+
+    const navNodeForDoc = function (docId, label, ariaLabel) {
+      if (!Number.isFinite(docId)) {
+        const disabled = document.createElement("span");
+        disabled.className = "message-nav-button is-disabled";
+        disabled.setAttribute("aria-hidden", "true");
+        disabled.textContent = label;
+        return disabled;
+      }
+
+      const link = document.createElement("a");
+      link.className = "message-nav-button";
+      link.dataset.docId = String(docId);
+      link.href = buildBrowseUrl(docId).toString();
+      link.setAttribute("aria-label", ariaLabel);
+      link.title = ariaLabel;
+      link.textContent = label;
+      return link;
+    };
+
+    const renderMessageNav = function (docId) {
+      const targets = navTargetsForDoc(docId);
+      const previousNode = navNodeForDoc(targets.previous, "\u2190", "Previous message");
+      const nextNode = navNodeForDoc(targets.next, "\u2192", "Next message");
+      previewNav.replaceChildren(previousNode, nextNode);
+    };
+
+    const setPreviewLoading = function (isLoading) {
+      preview.classList.toggle("is-loading", isLoading);
+    };
+
+    const currentSearchQuery = function () {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("q") || "";
+    };
+
+    const updatePreview = function (payload) {
+      previewFilename.textContent = payload.filename || "";
+      previewId.textContent = String(payload.id || "");
+      previewDate.textContent = payload.date || "Undated";
+      previewTime.textContent = payload.time || "Not available";
+      previewDataset.textContent = payload.dataset || "";
+      previewType.textContent = payload.type || "Not available";
+
+      if (payload.has_source_url && payload.source_url) {
+        previewSourceLink.href = payload.source_url;
+        previewSourceLink.removeAttribute("aria-disabled");
+      } else {
+        previewSourceLink.removeAttribute("href");
+        previewSourceLink.setAttribute("aria-disabled", "true");
+      }
+
+      previewFullLink.href = payload.full_view_url || "#";
+      if (payload.has_summary) {
+        previewSummary.hidden = false;
+        previewSummaryText.textContent = payload.summary || "";
+      } else {
+        previewSummary.hidden = true;
+        previewSummaryText.textContent = "";
+      }
+
+      previewMessage.innerHTML = payload.message_html || "";
+      previewMessage.scrollTop = 0;
+    };
+
+    let activeRequestId = 0;
+    const loadDocIntoPreview = async function (docId, fallbackHref) {
+      if (!Number.isFinite(docId)) {
+        if (fallbackHref) {
+          window.location.assign(fallbackHref);
+        }
         return;
       }
-      const amount = Math.max(messagePane.clientHeight - 24, 80);
-      messagePane.scrollBy({ top: amount * direction, behavior: "auto" });
+
+      activeRequestId += 1;
+      const requestId = activeRequestId;
+      setPreviewLoading(true);
+
+      try {
+        const apiUrl = new URL(apiUrlForDoc(docId), window.location.href);
+        apiUrl.searchParams.set("q", currentSearchQuery());
+        apiUrl.searchParams.set("back", buildBackUrl());
+        const response = await window.fetch(apiUrl.toString(), {
+          headers: { Accept: "application/json" },
+          credentials: "same-origin",
+        });
+        if (!response.ok) {
+          throw new Error("Doc preview request failed");
+        }
+        const payload = await response.json();
+        if (requestId !== activeRequestId) {
+          return;
+        }
+
+        updatePreview(payload);
+        setActiveDoc(docId);
+        renderMessageNav(docId);
+        saveScroll();
+        if (emptyPreview) {
+          emptyPreview.hidden = true;
+        }
+        window.history.replaceState({ docId: docId }, "", buildBrowseUrl(docId).toString());
+      } catch (error) {
+        if (requestId !== activeRequestId) {
+          return;
+        }
+        if (fallbackHref) {
+          window.location.assign(fallbackHref);
+          return;
+        }
+      } finally {
+        if (requestId === activeRequestId) {
+          setPreviewLoading(false);
+        }
+      }
     };
 
     document.addEventListener("keydown", function (event) {
@@ -542,22 +764,19 @@
       const activeIndex = activeRow ? links.indexOf(activeRow) : 0;
       const direction = event.key === "ArrowDown" ? 1 : -1;
       const nextIndex = Math.min(Math.max(activeIndex + direction, 0), links.length - 1);
-
       if (nextIndex === activeIndex) {
         return;
       }
 
       event.preventDefault();
       const nextLink = links[nextIndex];
-      const nextRow = nextLink ? nextLink.closest(".doc-row") : null;
+      const nextDocId = Number(nextLink.dataset.docId || "");
+      const nextRow = nextLink.closest(".doc-row");
       if (nextRow) {
         nextRow.scrollIntoView({ block: "nearest", inline: "nearest" });
       }
       saveScroll();
-      const nextUrl = new URL(nextLink.href, window.location.href);
-      nextUrl.searchParams.set(keyboardNavQueryParam, "1");
-      nextUrl.searchParams.set(listScrollQueryParam, String(list.scrollTop));
-      window.location.assign(nextUrl.toString());
+      loadDocIntoPreview(nextDocId, nextLink.href);
     });
 
     links.forEach(function (link) {
@@ -574,10 +793,27 @@
 
         event.preventDefault();
         saveScroll();
-        const nextUrl = new URL(link.href, window.location.href);
-        nextUrl.searchParams.set(listScrollQueryParam, String(list.scrollTop));
-        window.location.assign(nextUrl.toString());
+        const docIdFromData = Number(link.dataset.docId || "");
+        const docId = Number.isFinite(docIdFromData) ? docIdFromData : extractDocIdFromUrl(link.href);
+        loadDocIntoPreview(docId, link.href);
       });
+    });
+
+    previewNav.addEventListener("click", function (event) {
+      const button = event.target.closest("a.message-nav-button[data-doc-id]");
+      if (!button) {
+        return;
+      }
+      if (event.defaultPrevented) {
+        return;
+      }
+      if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+        return;
+      }
+      event.preventDefault();
+      saveScroll();
+      const docId = Number(button.dataset.docId || "");
+      loadDocIntoPreview(docId, button.href);
     });
   })();
 </script>

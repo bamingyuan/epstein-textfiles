@@ -706,6 +706,9 @@ body.filters-open {
   padding: 0.8rem 0.9rem;
   overflow: auto;
 }
+.doc-preview.is-loading {
+  opacity: 0.62;
+}
 
 .pane-preview .pane-header {
   padding: 0.6rem 0.75rem;
