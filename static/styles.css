@@ -374,7 +374,14 @@ a:hover {
 }
 
 .filter-drawer .date-section-days ul {
-  max-height: none;
+  max-height: 132px;
+}
+
+.filter-drawer .date-filter-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), #fff 26%);
 }
 
 body.filters-open {
@@ -525,16 +532,16 @@ body.filters-open {
 }
 
 .pane-nav .date-section-days {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
 .pane-nav .date-section-days ul {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
-  max-height: none;
+  max-height: 132px;
 }
 
 .date-section li {
