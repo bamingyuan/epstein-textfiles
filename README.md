@@ -1,48 +1,45 @@
 # Flask Document Browser
 
-Date-first document browser and search UI for `pdf_messages.db`.
+Document browser and search UI for newest Epstein file. Simple browsing like in an e-mail client. Included are Dataset 9 (partially), 10, 11.
 
 ## Features
 
 - Three-pane layout (email-style):
-  - Left: year/month/day navigation
+  - Left: year/month/day navigation (foldable)
   - Middle: paginated document list
   - Right: document preview with full text
 - Search with scope:
   - Current date view
   - Entire archive
 - Sorting:
-  - Date/time oldest first (default)
-  - Date/time newest first
-- Dedicated "Undated" browsing mode
+  - Date/time oldest first
 - Clickable original source URL for each document
-- Full document permalink page
 
 ## Quickstart
 
-1. Create and activate a virtual environment.
-2. Install dependencies:
+1. Download the database `pdf_messages.db.gz` from [URL]. Extract it into the project root so you end up with `pdf_messages.db`.
+2. Optional: Create and activate a virtual environment
+3. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Optional but strongly recommended: initialize indexes + FTS once.
+4. Optional but strongly recommended: initialize indexes + FTS once.
 
 ```bash
 python scripts/init_search.py --db pdf_messages.db
 ```
 
-4. Run the app:
+5. Run the app:
 
 ```bash
-flask --app app run --debug
+python app.py
 ```
 
 Open `http://127.0.0.1:5000`.
 
 ## Notes
 
-- The app defaults to the latest available dated month for browsing.
-- `from`, `to`, and `type` are shown in detail views, but are currently mostly empty in this dataset.
+- `from`, `to`, and `type` are shown in detail views, but are currently mostly empty in this dataset. This need further AI analysis and at the moment I don't want to pay for the tokens, yet.
 - Without FTS initialization, search falls back to `LIKE` and can be slower on large queries.
