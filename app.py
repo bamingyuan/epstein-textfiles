@@ -459,6 +459,29 @@ def date_value_clause(alias: str = "m") -> str:
     return f'SUBSTR({alias}."date", 1, 10)'
 
 
+def year_prefix(year: int) -> str:
+    return f"{year:04d}"
+
+
+def apply_year_index_bounds(
+    where: list[str],
+    params: list[object],
+    alias: str,
+    years: tuple[int, ...] | None = None,
+    max_year: int | None = None,
+) -> None:
+    if years:
+        where.append(f'{alias}."date" >= ?')
+        params.append(year_prefix(min(years)))
+        where.append(f'{alias}."date" < ?')
+        params.append(year_prefix(max(years) + 1))
+        return
+
+    if max_year is not None:
+        where.append(f'{alias}."date" < ?')
+        params.append(year_prefix(max_year + 1))
+
+
 def get_latest_available_date(conn: sqlite3.Connection, dataset: str | None = None) -> str | None:
     message_date = date_value_clause("messages")
     where = [date_exists_clause("messages"), f"{message_date} <= date('now')"]
@@ -557,9 +580,12 @@ def build_browse_filters(
     where.append(date_exists_clause("m"))
 
     if years:
+        apply_year_index_bounds(where, params, "m", years=years)
         clause, clause_params = build_integer_in_clause('CAST(SUBSTR(m."date", 1, 4) AS INTEGER)', years)
         where.append(clause)
         params.extend(clause_params)
+    else:
+        apply_year_index_bounds(where, params, "m", max_year=MAX_BROWSE_YEAR)
     where.append('CAST(SUBSTR(m."date", 1, 4) AS INTEGER) <= ?')
     params.append(MAX_BROWSE_YEAR)
     if months:
@@ -714,7 +740,9 @@ def year_counts(
     fts_enabled: bool,
 ) -> list[sqlite3.Row]:
     where = [date_exists_clause("m"), 'CAST(SUBSTR(m."date", 1, 4) AS INTEGER) <= ?']
-    params: list[object] = [MAX_BROWSE_YEAR]
+    params: list[object] = []
+    apply_year_index_bounds(where, params, "m", max_year=MAX_BROWSE_YEAR)
+    params.append(MAX_BROWSE_YEAR)
     from_sql = "messages m"
     if dataset:
         where.append('m."dataset" = ?')
@@ -743,6 +771,7 @@ def month_counts(
     where = [date_exists_clause("m")]
     params: list[object] = []
     from_sql = "messages m"
+    apply_year_index_bounds(where, params, "m", years=years)
     year_clause, year_params = build_integer_in_clause('CAST(SUBSTR(m."date", 1, 4) AS INTEGER)', years)
     where.append(year_clause)
     params.extend(year_params)
@@ -774,6 +803,7 @@ def day_counts(
     where = [date_exists_clause("m")]
     params: list[object] = []
     from_sql = "messages m"
+    apply_year_index_bounds(where, params, "m", years=years)
     year_clause, year_params = build_integer_in_clause('CAST(SUBSTR(m."date", 1, 4) AS INTEGER)', years)
     month_clause, month_params = build_integer_in_clause('CAST(SUBSTR(m."date", 6, 2) AS INTEGER)', months)
     where.extend([year_clause, month_clause])
