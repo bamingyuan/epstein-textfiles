@@ -14,7 +14,7 @@ Document browser and search UI for newest Epstein files. Simple browsing like in
 - Sorting:
   - Date/time oldest first
 - Clickable original source URL for each document
-- Use the keyboard arrow keyws Up and Down to browse through the documente and space to scroll through longer documents
+- Use the keyboard arrow keys Up and Down to browse through the documente and space to scroll through longer documents
 
 ## Quickstart
 
