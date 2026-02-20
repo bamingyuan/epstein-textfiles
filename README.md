@@ -2,7 +2,7 @@
 
 Document browser and search UI for newest Epstein files. Simple browsing like in an e-mail client. Included are Dataset 9 (partially), 10, 11.
 
-![Tool screenshot](static/epstein-browser.png?raw=true "Epstein Browser")
+![Tool screenshot](static/epstein_browser.png?raw=true "Epstein Browser")
 
 ## Features
 
