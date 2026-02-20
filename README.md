@@ -1,6 +1,6 @@
-# Flask Document Browser
+# Epstein Document Browser
 
-Document browser and search UI for newest Epstein file. Simple browsing like in an e-mail client. Included are Dataset 9 (partially), 10, 11.
+Document browser and search UI for newest Epstein files. Simple browsing like in an e-mail client. Included are Dataset 9 (partially), 10, 11.
 
 ## Features
 
