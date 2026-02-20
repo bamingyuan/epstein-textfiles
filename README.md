@@ -18,7 +18,7 @@ Document browser and search UI for newest Epstein file. Simple browsing like in 
 
 ## Quickstart
 
-1. Download the database `pdf_messages.db.gz` from [URL]. Extract it into the project root so you end up with `pdf_messages.db`.
+1. Download the database `pdf_messages.db.gz` from [mega.nz](https://mega.nz/file/OQcynIDS#zarOf5Yz_NjP9IBCC6Qva9rK0VLkcarxc2AFbQZ27Ng). Extract it into the project root so you end up with `pdf_messages.db`.
 2. Optional: Create and activate a virtual environment
 3. Install dependencies:
 
