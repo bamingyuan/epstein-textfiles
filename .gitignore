@@ -3,3 +3,4 @@ scripts/__pycache__/
 *.db
 *.db-journal
 .venv/
+*.gz
